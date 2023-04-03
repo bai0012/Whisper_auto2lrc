@@ -86,6 +86,12 @@ pip install ffmpeg-python
 ### 我应该使用什么模型，各个模型有什么区别？
 
 参见[openai/whisper](https://github.com/openai/whisper#available-models-and-languages)
-
+|  Size  | Parameters | English-only model | Multilingual model | Required VRAM | Relative speed |
+|:------:|:----------:|:------------------:|:------------------:|:-------------:|:--------------:|
+|  tiny  |    39 M    |     `tiny.en`      |       `tiny`       |     ~1 GB     |      ~32x      |
+|  base  |    74 M    |     `base.en`      |       `base`       |     ~1 GB     |      ~16x      |
+| small  |   244 M    |     `small.en`     |      `small`       |     ~2 GB     |      ~6x       |
+| medium |   769 M    |    `medium.en`     |      `medium`      |     ~5 GB     |      ~2x       |
+| large  |   1550 M   |        N/A         |      `large`       |    ~10 GB     |       1x       |
 
 请根据你所拥有GPU的显存大小选择模型，一般来说，越大的模型速度越快，错误率越低。
