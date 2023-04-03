@@ -5,7 +5,7 @@
 
 首先安装python，我使用的是python3.10.10
 
-然后根据whisper的要求安装python依赖库[openai/whisper](https://github.com/openai/whisper)
+然后根据whisper的要求安装python依赖库[openai/whisper](https://github.com/openai/whisper#setup)
 
 下载srt_to_lrc.py和whisper.ps1
 
@@ -44,3 +44,43 @@ cd 放置whisper.ps1的文件夹
 ```powershell
 ./whisper.ps1
 ```
+
+## 疑难解答
+
+### 为什么我的Whisper只调用了CPU？
+
+Whisper可以调用支持CUDA的GPU，如果你确认GPU已经正确安装并且支持CUDA，请尝试以下步骤：
+
+```python 
+pip uninstall torch
+```
+
+```python 
+pip cache purge
+```
+然后在[PyTorch官网](https://pytorch.org/get-started/locally/)使用命令安装最新的PyTorch
+
+如：
+```python
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+应该就可以正常调用显卡了
+
+### 为什么使用时ffmpeg报错？
+
+可以尝试以下步骤重新安装ffmpeg：
+
+```python
+pip uninstall ffmpeg
+```
+
+```python 
+pip uninstall ffmpeg-python
+```
+
+```python
+pip install ffmpeg-python
+```
+
+
