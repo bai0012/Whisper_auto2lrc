@@ -2,7 +2,7 @@
 $folderPath = "C:\Path\To\Audio\Folder"
 
 # 获取要转换的所有音频文件
-$audioFiles = Get-ChildItem $folderPath -Recurse -Include "*.mp3", "*.wav"
+$audioFiles = Get-ChildItem $folderPath -Recurse -Include "*.mp3", "*.wav", "*.flac", "*.m4a", "*.aac", "*.wma", "*.ogg"
 
 # 设置进度条初始值
 $i = 0
@@ -25,7 +25,7 @@ foreach ($file in $audioFiles) {
         $srtFile = Get-ChildItem $file.DirectoryName -Include "*.srt" -Recurse | Where-Object { $_.Name -match $file.BaseName }
         if ($srtFile) {
             $lrcFile = $srtFile.FullName.Replace(".srt", ".lrc")
-            & python "R:/srt_to_lrc.py" $srtFile.FullName $lrcFile
+            & python srt_to_lrc.py $srtFile.FullName $lrcFile
         }
         
         # 删除由Whisper生成的文件
