@@ -1,4 +1,7 @@
 # Whisper_auto2lrc
+
+## 目前生成lrc的python程序出现问题，正在修复
+
 使用whisper通过powershell和python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
 ## 本程序大部分由ChatGPT生成
