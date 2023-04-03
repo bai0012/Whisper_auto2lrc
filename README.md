@@ -45,6 +45,8 @@ cd 放置whisper.ps1的文件夹
 ./whisper.ps1
 ```
 
+![](https://img.imoutomoe.net/images/2023/04/03/-2023-04-03-151640.png)
+
 ## 疑难解答
 
 ### 为什么我的Whisper只调用了CPU？
