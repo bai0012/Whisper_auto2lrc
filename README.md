@@ -26,12 +26,8 @@ $folderPath = "C:\Path\To\Audio\Folder"
 whisper --model small --language ja $file.FullName
  ```
  
- ### 设定srt_to_lrc.py文件的路径
- 
- 第28行
- ```powershell
- & python "R:/srt_to_lrc.py" $srtFile.FullName $lrcFile
- ```
+ ### 将srt_to_lrc.py与whisper.ps1放在同一文件夹内
+
 
 ## 如何使用：
 
