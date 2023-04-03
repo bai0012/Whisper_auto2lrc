@@ -83,4 +83,9 @@ pip uninstall ffmpeg-python
 pip install ffmpeg-python
 ```
 
+### 我应该使用什么模型，各个模型有什么区别？
 
+参见[openai/whisper](https://github.com/openai/whisper#available-models-and-languages)
+
+
+请根据你所拥有GPU的显存大小选择模型，一般来说，越大的模型速度越快，错误率越低。
