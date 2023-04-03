@@ -32,3 +32,15 @@ $folderPath = "R:"
  ```powershell
  & python "R:/srt_to_lrc.py" $srtFile.FullName $lrcFile
  ```
+
+## 如何使用：
+
+在修改好whisper.ps1之后，打开Windows PowerShell
+
+```powershell
+cd 放置whisper.ps1的文件夹
+```
+
+```powershell
+./whisper.ps1
+```
