@@ -16,19 +16,19 @@
 
 第2行
 ```powershell
-$folderPath = "R:"
+$folderPath = "C:\Path\To\Audio\Folder"
 ```
 
 ### 设定whisper的参数，默认为small模型，语言为日语
 
-第16行
+第22行
  ```powershell
- whisper --model small --language ja $file.FullName
+whisper --model small --language ja $file.FullName
  ```
  
  ### 设定srt_to_lrc.py文件的路径
  
- 第22行
+ 第28行
  ```powershell
  & python "R:/srt_to_lrc.py" $srtFile.FullName $lrcFile
  ```
