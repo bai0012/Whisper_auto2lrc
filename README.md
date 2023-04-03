@@ -95,3 +95,5 @@ pip install ffmpeg-python
 | large  |   1550 M   |        N/A         |      `large`       |    ~10 GB     |       1x       |
 
 请根据你所拥有GPU的显存大小选择模型，一般来说，越大的模型速度越快，错误率越低。
+
+(例如，你拥有RTX3060 12G，那你就可以选择large模型，而你拥有的是GTX 1050ti 4G，那你就只能使用small模型了)
