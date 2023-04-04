@@ -21,11 +21,11 @@
 然后在powershell中运行下列指令：
 
 
-```
+```git
 git clone https://github.com/bai0012/Whisper_auto2lrc
 ```
 
-```
+```Powershell
 cd Whisper_auto2lrc
 ```
 
@@ -34,14 +34,17 @@ pip install requirements.txt -r
 ```
 
 
-
 ## 如何使用：
 
+在Powershell路径处于项目文件夹的基础上，运行
 
+```Powershell
+python main.py
+```
 
-根据提示输入要处理的音频文件夹，选择模型，并选择目标语言。
+根据提示输入要处理的音频文件夹，选择模型，并选择目标语言，等待处理完成即可。
 
-![](https://img.imoutomoe.net/images/2023/04/04/-2023-04-04-130758.png)
+![](https://raw.githubusercontent.com/bai0012/Whisper_auto2lrc/main/demo.png)
 
 ## 疑难解答
 
