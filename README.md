@@ -2,29 +2,42 @@
 
 使用whisper通过powershell和python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
-## TODO：将此程序转化为全python程序
+本程序在ChatGPT指导下生成
 
-本程序大部分由ChatGPT生成
+##这个程序能干什么？
 
-首先安装python，我使用的是python3.10.10
+它可以使用openai发布的whisper语音转文字模型，由用户制定需要处理的音频文件夹，程序将自动递归搜索所有文件夹音频文件，并且将其转录为lrc格式的字幕文件。
+
+适合有大量音频文件需要转录为字幕的用户。
+
+后续将加入自动翻译。
+
+## 如何安装：
+
+首先安装python，推荐使用python3.10.10
 
 然后根据whisper的要求安装python依赖库[openai/whisper](https://github.com/openai/whisper#setup)
 
-下载srt_to_lrc.py和whisper.ps1
+然后在powershell中运行下列指令：
+
+
+```
+git clone https://github.com/bai0012/Whisper_auto2lrc
+```
+
+```
+cd Whisper_auto2lrc
+```
+
+```python
+pip install requirements.txt -r
+```
 
 
 
 ## 如何使用：
 
-打开Windows PowerShell
 
-```powershell
-cd 放置whisper.ps1的文件夹
-```
-
-```powershell
-./whisper.ps1
-```
 
 根据提示输入要处理的音频文件夹，选择模型，并选择目标语言。
 

@@ -1,0 +1,2 @@
+prettytable==3.6.0
+tqdm==4.65.0
