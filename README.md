@@ -1,6 +1,6 @@
 # Whisper_auto2lrc
 
-使用whisper通过powershell和python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
+使用whisper通过python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
 本程序在ChatGPT指导下生成
 
