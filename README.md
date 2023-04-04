@@ -2,7 +2,9 @@
 
 使用whisper通过powershell和python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
-## 本程序大部分由ChatGPT生成
+## TODO：将此程序转化为全python程序
+
+本程序大部分由ChatGPT生成
 
 首先安装python，我使用的是python3.10.10
 
