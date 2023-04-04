@@ -30,7 +30,7 @@ cd Whisper_auto2lrc
 ```
 
 ```python
-pip install requirements.txt -r
+pip install -r requirements.txt 
 ```
 
 
