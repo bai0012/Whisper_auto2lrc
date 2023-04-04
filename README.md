@@ -98,3 +98,18 @@ pip install ffmpeg-python
 请根据你所拥有GPU的显存大小选择模型，一般来说，越大的模型速度越快，错误率越低。
 
 (例如，你拥有RTX3060 12G，那你就可以选择large模型，而你拥有的是GTX 1050ti 4G，那你就只能使用small模型了)
+
+### 在提示“请求用户输入语言”时，我应该输入什么？
+
+whsiper支持多种语言的语音转文字，常用的有：
+|  语言  | 代码 |
+|:-----:|:---:|
+|  汉语  | zh |
+|  英语  | en |
+|  俄语  | ru |
+|  日语  | ja |
+|  韩语  | ko |
+|  德语  | de |
+|  意大利语  | it |
+
+更多语言，请参考：[whisper/tokenizer.py](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py)
