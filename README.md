@@ -1,7 +1,5 @@
 # Whisper_auto2lrc
 
-## 目前生成lrc的python程序出现问题，正在修复
-
 使用whisper通过powershell和python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
 ## 本程序大部分由ChatGPT生成
@@ -13,28 +11,10 @@
 下载srt_to_lrc.py和whisper.ps1
 
 
-## 自定义，修改whisper.ps1的下列内容：
-
-### 修改要处理的mp3文件的路径，（包括文件夹和子文件夹）
-
-第2行
-```powershell
-$folderPath = "C:\Path\To\Audio\Folder"
-```
-
-### 设定whisper的参数，默认为small模型，语言为日语
-
-第22行
- ```powershell
-whisper --model small --language ja $file.FullName
- ```
- 
- ### 将srt_to_lrc.py与whisper.ps1放在同一文件夹内
-
 
 ## 如何使用：
 
-在修改好whisper.ps1之后，打开Windows PowerShell
+打开Windows PowerShell
 
 ```powershell
 cd 放置whisper.ps1的文件夹
@@ -44,7 +24,9 @@ cd 放置whisper.ps1的文件夹
 ./whisper.ps1
 ```
 
-![](https://img.imoutomoe.net/images/2023/04/03/-2023-04-03-151640.png)
+根据提示输入要处理的音频文件夹，选择模型，并选择目标语言。
+
+![](https://img.imoutomoe.net/images/2023/04/04/-2023-04-04-130758.png)
 
 ## 疑难解答
 
