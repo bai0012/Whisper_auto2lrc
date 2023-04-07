@@ -2,8 +2,6 @@
 
 使用whisper通过python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
-(本程序在ChatGPT指导下生成)
-
 ### 目前程序还没有达到预期的效果，正在修复
 
 ## 这个程序能干什么？
@@ -115,3 +113,4 @@ whsiper支持多种语言的语音转文字，常用的有：
 |  意大利语  | it |
 
 更多语言，请参考：[whisper/tokenizer.py](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py)
+(本程序在ChatGPT指导下生成)
