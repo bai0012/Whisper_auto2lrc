@@ -26,15 +26,7 @@ pip install git+https://github.com/openai/whisper.git
 
 ## 如何使用：
 
-### 使用打包好的应用程序：
-
-前往[Releases](https://github.com/bai0012/Whisper_auto2lrc/releases)下载编译打包好的Whisper_auto2lrc.exe
-
-运行Whisper_auto2lrc.exe。
-
-在窗口中选择文件夹路径，选择要使用的模型大小，输入要处理的音频文件语言，点击开始即可
-
-### 或使用源代码程序
+### 使用源代码程序
 
 拉取该repo，并且安装Python依赖项：
 
