@@ -11,7 +11,7 @@
 后续将加入自动翻译。
 
 ## 程序截图：
-![](https://raw.githubusercontent.com/bai0012/Whisper_auto2lrc/main/demo.png)
+![]()
 
 ## 如何安装：
 
