@@ -10,10 +10,10 @@
 
 后续将加入自动翻译。
 
-## 程序截图：
+## 程序截图
 ![](https://raw.githubusercontent.com/bai0012/Whisper_auto2lrc/main/demo2.0.png)
 
-## 如何安装：
+## 如何安装
 
 首先安装python，已经在python3.10.11上测试
 
@@ -24,7 +24,7 @@ pip install git+https://github.com/openai/whisper.git
 ```
 
 
-## 如何使用：
+## 如何使用
 
 ### 使用源代码程序
 
