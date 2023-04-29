@@ -1,2 +1,9 @@
-prettytable==3.6.0
-tqdm==4.65.0
+PyQt5
+PyQt5_sip
+numba
+numpy
+torch
+tqdm
+more-itertools
+tiktoken==0.3.1
+ffmpeg-python==0.2.0

@@ -1,53 +1,109 @@
 import os
+import sys
+import shutil
 import subprocess
-import json
-import tkinter as tk
-from tkinter import filedialog
-from prettytable import PrettyTable
-from tqdm import tqdm
+from pathlib import Path
 
-# 由用户设定路径、模型和语言
-os.system('python load_config.py') 
-# 读取 config.json 文件
-with open("config.json", "r") as f:
-    config = json.load(f)
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton, QFileDialog, QComboBox, QLineEdit, QFormLayout
+from PyQt5.QtCore import QThread, pyqtSignal
 
-# 获取要转换的所有音频文件
-audio_files = []
-for root, dirs, files in os.walk(config["folderPath"]):
-    for file in files:
-        if file.endswith((".mp3", ".wav")):
-            audio_files.append(os.path.join(root, file))
+class Worker(QThread):
+    progress = pyqtSignal(str, int)
 
-# 设置进度条初始值
-i = 0
+    def __init__(self, folder, model, language):
+        super().__init__()
+        self.folder = folder
+        self.model = model
+        self.language = language
 
-# 遍历每个音频文件并进行转换
-for file in tqdm(audio_files, desc="Converting audio files..."):
-    # 更新进度条
-    i += 1
-    
-    # 获取同名的 .lrc 文件，如果存在则直接跳过转换
-    lrc_file = os.path.join(os.path.dirname(file), os.path.splitext(os.path.basename(file))[0] + ".lrc")
-    if os.path.exists(lrc_file):
-        continue
-    
-    # 执行 Whisper 命令将音频转换为文本
-    subprocess.run(['whisper', '--model', config['modelChoice'], '--language', config['language'], file], check=True)
-    
-    # 获取同名的 .srt 文件并调用 Python 程序将其转换为 .lrc 文件
-    srt_file = os.path.join(os.path.dirname(file), os.path.splitext(os.path.basename(file))[0] + ".srt")
-    if os.path.exists(srt_file):
-        subprocess.run(['python', 'srt_to_lrc.py', srt_file], check=True)
-    
-    # 删除由 Whisper 生成的文件
-    file_basename = os.path.splitext(os.path.basename(file))[0]
-    for whisper_file in os.listdir(os.path.dirname(file)):
-        if file_basename in whisper_file and whisper_file.endswith((".json", ".tsv", ".txt", ".vtt")):
-            os.remove(os.path.join(os.path.dirname(file), whisper_file))
-    
-# 更新进度条，指示转换已完成
-tqdm.write("Conversion completed.")
+    def run(self):
+        audio_extensions = {'.mp3', '.wav'}
+        temp_dir = Path('temp')
+        temp_dir.mkdir(exist_ok=True)
 
-# 显示 "Finish" 并黄色高亮显示
-print("\033[33mFinish\033[0m")
+        audio_files = [f for f in Path(self.folder).rglob('*') if f.suffix in audio_extensions and not (f.with_suffix('.lrc')).exists()]
+
+        total_files = len(audio_files)
+        for idx, audio_file in enumerate(audio_files):
+            progress_text = f'处理中: {audio_file.name} ({idx + 1}/{total_files})'
+            self.progress.emit(progress_text, int((idx + 1) / total_files * 100))
+
+            srt_file = temp_dir / (audio_file.stem + '.srt')
+            subprocess.run(f'whisper "{audio_file}" --model {self.model} --language {self.language}', shell=True, cwd=temp_dir)
+
+            if srt_file.exists():
+                subprocess.run(f'python srt_to_lrc.py "{srt_file}"', shell=True)
+                lrc_file = temp_dir / (audio_file.stem + '.lrc')
+                if lrc_file.exists():
+                    shutil.move(lrc_file, audio_file.with_suffix('.lrc'))
+
+        shutil.rmtree(temp_dir)
+
+class App(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        layout = QVBoxLayout()
+
+        form_layout = QFormLayout()
+        self.folder_path = QLineEdit()
+        form_layout.addRow("文件夹路径", self.folder_path)
+
+        self.model_select = QComboBox()
+        self.model_select.addItems(["tiny", "base", "small", "medium", "large"])
+        form_layout.addRow("模型大小", self.model_select)
+
+        self.language_input = QLineEdit()
+        form_layout.addRow("语言", self.language_input)
+        layout.addLayout(form_layout)
+
+        self.progress_label = QLabel("准备开始...")
+        layout.addWidget(self.progress_label)
+
+        self.progress_bar = QProgressBar()
+        layout.addWidget(self.progress_bar)
+
+        self.start_button = QPushButton("开始")
+        self.start_button.clicked.connect(self.start_processing)
+        layout.addWidget(self.start_button)
+
+        self.select_folder_button = QPushButton("选择文件夹")
+        self.select_folder_button.clicked.connect(self.select_folder)
+        layout.addWidget(self.select_folder_button)
+
+        self.setLayout(layout)
+
+    def select_folder(self):
+        folder = QFileDialog.getExistingDirectory()
+        if folder:
+            self.folder_path.setText(folder)
+
+    def start_processing(self):
+        folder = self.folder_path.text()
+        model = self.model_select.currentText()
+        language = self.language_input.text()
+        if not folder or not language:
+            return
+
+        self.start_button.setEnabled(False)
+        self.select_folder_button.setEnabled(False)
+
+        self.worker = Worker(folder, model, language)
+        self.worker.progress.connect(self.update_progress)
+        self.worker.finished.connect(self.worker_finished)
+        self.worker.start()
+
+    def update_progress(self, text, value):
+        self.progress_label.setText(text)
+        self.progress_bar.setValue(value)
+
+    def worker_finished(self):
+        self.progress_label.setText("完成！")
+        self.start_button.setEnabled(True)
+        self.select_folder_button.setEnabled(True)
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = App()
+    window.show()
+    sys.exit(app.exec_())
