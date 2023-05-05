@@ -119,5 +119,9 @@ whsiper支持多种语言的语音转文字，常用的有：
 
 更多语言，请参考：[whisper/tokenizer.py](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=bai0012/Whisper_auto2lrc&type=Date)](https://star-history.com/#bai0012/Whisper_auto2lrc&Date)
+
 
 (本程序在GPT 4指导下完成)
