@@ -2,7 +2,7 @@
 
 使用whisper通过python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
-### 现在整合了 [Faster Whisper](https://github.com/guillaumekln/faster-whisper) 以实现更快速的推理和更低的显存使用量！
+### 现在整合了 [Faster Whisper](https://github.com/guillaumekln/faster-whisper) 以实现更快速的推理和更低的显存使用量！（约5倍推理速度和少一半的显存需求）
 
 ### 推荐使用 [Faster Whisper](https://github.com/guillaumekln/faster-whisper) 
 
