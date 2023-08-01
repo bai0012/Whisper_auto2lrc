@@ -2,7 +2,7 @@
 
 使用whisper通过python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
-### 现在整合了 [Faster Whisper](https://github.com/guillaumekln/faster-whisper) 以实现更快速的推理和更低的显存使用量！（约5倍推理速度和少一半的显存需求）
+### 现在整合了 [Faster Whisper](https://github.com/guillaumekln/faster-whisper) 以实现更快速的推理和更低的显存使用量！（约4倍推理速度和少一半的显存需求）
 
 ### 推荐使用 [Faster Whisper](https://github.com/guillaumekln/faster-whisper) 
 
@@ -140,6 +140,8 @@ pip install ffmpeg-python
 (例如，你拥有RTX3060 12G，那你就可以选择large模型，而你拥有的是GTX 1050ti 4G，那你就只能使用small模型了)
 
 Faster Whisper使用相同的模型，所需的显存量更小，请自行尝试。
+
+(Faster Whisper在1050ti 4G上甚至能跑large模型，只不过有时会爆显存，估计6G显存就足以跑动large模型)
 
 ### 在语言输入框中，我应该输入什么？
 
