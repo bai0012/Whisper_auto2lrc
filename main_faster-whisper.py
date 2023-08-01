@@ -30,7 +30,7 @@ class Worker(QThread):
             self.progress.emit(progress_text, int((idx + 1) / total_files * 100))
 
             srt_file = temp_dir / (audio_file.stem + '.srt')
-            subprocess.run(f'whisper "{audio_file}" --model {self.model} --language {self.language}', shell=True, cwd=temp_dir)
+            subprocess.run(f'whisper-ctranslate2 "{audio_file}" --model {self.model} --language {self.language} --vad_filter True --print_colors True', shell=True, cwd=temp_dir)
 
             if srt_file.exists():
                 subprocess.run(f'python srt_to_lrc.py "{srt_file}"', shell=True)
@@ -54,7 +54,7 @@ class App(QWidget):
         form_layout.addRow("文件夹路径", self.folder_path)
 
         self.model_select = QComboBox()
-        self.model_select.addItems(["tiny", "base", "small", "medium", "large"])
+        self.model_select.addItems(["tiny", "base", "small", "medium", "large-v2"])
         form_layout.addRow("模型大小", self.model_select)
 
         self.language_input = QLineEdit()
