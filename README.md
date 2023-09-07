@@ -3,7 +3,6 @@
 <p align="center">
     <br> English | <a href="README-CN.md">中文</a>
 
-# Whisper_auto2lrc
 
 Whisper_auto2lrc is a tool that uses the whisper model and a Python program to convert all audio files in a folder (and its subfolders) into .lrc subtitle files. If an lrc subtitle file already exists, it will be automatically skipped.
 
