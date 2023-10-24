@@ -1,6 +1,10 @@
 # Whisper_auto2lrc
 
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+<img alt="GitHub Top Language" src="https://img.shields.io/github/languages/top/bai0012/Whisper_auto2lrc" />
+<img alt="GitHub Last Commit" src="https://img.shields.io/github/last-commit/bai0012/Whisper_auto2lrc" />
+<img alt="GitHub Commit Activity (Year)" src="https://img.shields.io/github/commit-activity/y/bai0012/Whisper_auto2lrc" />
+
 
 使用whisper通过python程序实现文件夹下（及子文件夹）所有音频文件转换为.lrc字幕文件，若已存在lrc字幕文件，则自动跳过
 
