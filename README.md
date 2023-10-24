@@ -1,5 +1,7 @@
 # Whisper_auto2lrc
 
+[![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+
 <p align="center">
     <br> English | <a href="README-CN.md">中文</a>
 
