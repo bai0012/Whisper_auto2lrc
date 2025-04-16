@@ -11,9 +11,6 @@
 
 Whisper_auto2lrc is a tool that uses the whisper model and a Python program to convert all audio files in a folder (and its subfolders) into .lrc subtitle files. If an lrc subtitle file already exists, it will be automatically skipped.
 
-### Now integrated with [Faster Whisper](https://github.com/guillaumekln/faster-whisper) for faster inference and lower memory usage! (Approximately 4 times faster inference speed and half the memory requirement)
-
-### Recommended to use [Faster Whisper](https://github.com/guillaumekln/faster-whisper)
 
 ## What can this program do?
 
@@ -21,27 +18,19 @@ It uses the whisper speech-to-text model released by OpenAI. Users can specify t
 
 It is suitable for users who need to transcribe a large number of audio files into subtitles.
 
-Automatic translation will be added in the future.
 
 ## Screenshots
-![](https://raw.githubusercontent.com/bai0012/Whisper_auto2lrc/main/demo2.0.png)
+![](https://raw.githubusercontent.com/bai0012/Whisper_auto2lrc/main/demo.png)
 
-Using Faster Whisper
-![](https://raw.githubusercontent.com/bai0012/Whisper_auto2lrc/main/demo2.0_1.png)
 
 ## How to install
 
-First, install Python, which has been tested on Python 3.10.11.
+First, install Python, which has been tested on Python 3.11
 
 Then, install the Python dependencies required by whisper [openai/whisper](https://github.com/openai/whisper#setup):
 
 ```python
 pip install git+https://github.com/openai/whisper.git 
-```
-
-If you want to use Faster Whisper, you need to install the dependencies of the Faster Whisper command line version [Softcatala/whisper-ctranslate2](https://github.com/Softcatala/whisper-ctranslate2#installation)
-```python
-pip install -U whisper-ctranslate2
 ```
 
 ## How to use
@@ -62,36 +51,17 @@ cd Whisper_auto2lrc
 pip install -r requirements.txt 
 ```
 
+Download FFmpeg and add the folder containing ffmpeg.exe to the system variables. For example, [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases).
+
 With the terminal at the base of the project folder, run
 
 ```Powershell
 python main.py
 ```
 
-If you want to use Faster Whisper, run
-
-```Powershell
-python main_faster-whisper.py
-```
-(Faster Whisper has the [Silero VAD filter](https://github.com/snakers4/silero-vad) turned on by default to skip blank audio segments over two seconds, and uses colors to indicate the confidence level of each character, with red indicating low confidence and green indicating high confidence)
-
 In the window, select the folder path, choose the model size to use, enter the language of the audio files to be processed, and click start.
 
 ## Troubleshooting
-
-### What's the difference between Faster Whisper and the original Whisper?
-
-Faster-whisper is a reimplementation of OpenAI's Whisper model using CTranslate2, a fast inference engine for Transformer models.
-
-This implementation is 4 times faster than openai/whisper, uses less memory and VRAM, and has the same accuracy.
-
-According to [guillaumekln/faster-whisper](https://github.com/guillaumekln/faster-whisper#benchmark), the performance improvement of using the large-v2 model on NVIDIA Tesla V100S is shown in the following table:
-
-| Implementation | Precision | Beam size | Time required | Maximum GPU memory required | Maximum memory required |
-| --- | --- | --- | --- | --- | --- |
-| openai/whisper | fp16 | 5 | 4m30s | 11325MB | 9439MB |
-| faster-whisper | fp16 | 5 | 54s | 4755MB | 3244MB |
-| faster-whisper | int8 | 5 | 59s | 3091MB | 3117MB |
 
 ### Why is my Whisper only using the CPU?
 
@@ -104,11 +74,11 @@ pip uninstall torch
 ```python 
 pip cache purge
 ```
-Then install the latest PyTorch using the command on the [PyTorch official website](https://pytorch.org/get-started/locally/)
+Then install the latest PyTorch using the command on the [PyTorch](https://pytorch.org/get-started/locally/)
 
 For example:
 ```python
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 ```
 
 You should be able to call the graphics card normally.
@@ -134,11 +104,12 @@ pip install ffmpeg-python
 Refer to [openai/whisper](https://github.com/openai/whisper#available-models-and-languages)
 |  Size  | Parameters | English-only model | Multilingual model | Required VRAM | Relative speed |
 |:------:|:----------:|:------------------:|:------------------:|:-------------:|:--------------:|
-|  tiny  |    39 M    |     `tiny.en`      |       `tiny`       |     ~1 GB     |      ~32x      |
-|  base  |    74 M    |     `base.en`      |       `base`       |     ~1 GB     |      ~16x      |
-| small  |   244 M    |     `small.en`     |      `small`       |     ~2 GB     |      ~6x       |
+|  tiny  |    39 M    |     `tiny.en`      |       `tiny`       |     ~1 GB     |      ~10x      |
+|  base  |    74 M    |     `base.en`      |       `base`       |     ~1 GB     |      ~7x       |
+| small  |   244 M    |     `small.en`     |      `small`       |     ~2 GB     |      ~4x       |
 | medium |   769 M    |    `medium.en`     |      `medium`      |     ~5 GB     |      ~2x       |
 | large  |   1550 M   |        N/A         |      `large`       |    ~10 GB     |       1x       |
+| turbo  |   809 M    |        N/A         |      `turbo`       |     ~6 GB     |      ~8x       |
 
 Choose the model based on the size of the VRAM on your GPU. Generally, the larger the model, the faster the speed and the lower the error rate.
 
@@ -167,4 +138,4 @@ For more languages, refer to: [whisper/tokenizer.py](https://github.com/openai/w
 
 [![Star History Chart](https://api.star-history.com/svg?repos=bai0012/Whisper_auto2lrc&type=Date)](https://star-history.com/#bai0012/Whisper_auto2lrc&Date)
 
-(This program was completed under the guidance of GPT 4)
+This program was completed under the guidance of GPT-4, with special thanks to [chshkhr](https://github.com/chshkhr) for their contributions.
