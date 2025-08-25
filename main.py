@@ -64,10 +64,8 @@ else:
     APP_BASE_DIR = Path(__file__).resolve().parent
 
 # Global variable to hold the loaded Whisper model (optional optimization)
-# Set to None initially. Will be loaded by the worker.
-# This prevents reloading the model for every run if the app stays open,
-# but means the model stays in memory. Load inside Worker for per-run loading.
-# WHISPER_MODEL_CACHE = {} # Or load inside worker run()
+# This dictionary will store models as {model_name: model_object}
+WHISPER_MODEL_CACHE = {}
 
 # --- Helper Function for SRT Time Formatting ---
 def format_srt_time(seconds: float) -> str:
@@ -121,31 +119,77 @@ class Worker(QThread):
         self._is_running = False
         # Note: Stopping doesn't immediately interrupt a running model.transcribe() call
 
+    def _load_model(self):
+        """Loads a model from cache or from disk."""
+        if self.model_name in WHISPER_MODEL_CACHE:
+            self.progress.emit(f"Using cached model '{self.model_name}'.", 0)
+            self.whisper_model = WHISPER_MODEL_CACHE[self.model_name]
+        else:
+            self.progress.emit(f"Loading new model '{self.model_name}' into cache...", 0)
+            self.whisper_model = whisper.load_model(self.model_name)
+            WHISPER_MODEL_CACHE[self.model_name] = self.whisper_model
+        self.progress.emit(f"Model '{self.model_name}' is ready.", 0)
+
+    def _process_file(self, audio_file, total_files, idx):
+        """Processes a single audio file."""
+        progress_text = f'Processing: {audio_file.name} ({idx + 1}/{total_files})'
+        self.progress.emit(progress_text, int((idx / total_files) * 100))
+        QApplication.processEvents() # Ensure label updates before potentially long transcribe
+
+        expected_srt_file_path = self.temp_dir_path / (audio_file.stem + '.srt')
+        generated_lrc_path = None # Reset for each file
+
+        try:
+            # --- Transcribe using Whisper library ---
+            transcribe_options = {"language": self.language} # Add other options like fp16=False if needed
+            result = self.whisper_model.transcribe(str(audio_file), **transcribe_options, verbose=False) # verbose=False suppresses console output
+
+            # --- Generate SRT Content from Result ---
+            srt_data = generate_srt_content(result)
+            if not srt_data:
+                 self.error_occurred.emit(f"Whisper produced no output for {audio_file.name}")
+                 return # Skip to next file
+
+            # --- Write SRT to Temp File ---
+            try:
+                with open(expected_srt_file_path, 'w', encoding='utf-8') as srt_f:
+                    srt_f.write(srt_data)
+            except IOError as io_err:
+                self.error_occurred.emit(f"Failed to write temporary SRT file {expected_srt_file_path.name}: {io_err}")
+                return # Skip to next file
+
+            # --- Convert SRT to LRC (using existing function) ---
+            if expected_srt_file_path.exists():
+                generated_lrc_path = srt_to_lrc.srt_to_lrc(expected_srt_file_path) # This deletes the SRT file
+
+                if generated_lrc_path and generated_lrc_path.exists():
+                    target_lrc_path = audio_file.with_suffix('.lrc')
+                    try:
+                        shutil.move(str(generated_lrc_path), str(target_lrc_path))
+                    except Exception as move_err:
+                        self.error_occurred.emit(f"Failed to move {generated_lrc_path.name} to target: {move_err}")
+                elif expected_srt_file_path.exists(): # Should have been deleted by srt_to_lrc
+                    self.error_occurred.emit(f"LRC conversion failed but SRT still exists for {audio_file.name}")
+                else:
+                    self.error_occurred.emit(f"LRC file not generated for {audio_file.name} after SRT processing.")
+
+            else:
+                # This case should ideally not happen if SRT writing succeeded
+                self.error_occurred.emit(f"Temporary SRT file disappeared before conversion for {audio_file.name}")
+
+        except Exception as e:
+            self.error_occurred.emit(f"Error processing {audio_file.name}: {e}\n{traceback.format_exc()}")
+            # Clean up potentially leftover temp files for this failed audio
+            if expected_srt_file_path.exists():
+                try: expected_srt_file_path.unlink()
+                except OSError: pass
+            if generated_lrc_path and generated_lrc_path.exists():
+                 try: generated_lrc_path.unlink()
+                 except OSError: pass
+
     def run(self):
         try:
-            # --- Load Whisper Model ---
-            # Consider moving model loading outside if you want to cache it
-            # across multiple runs within the same app session.
-            # Loading here ensures it uses the selected model for this run.
-            self.progress.emit(f"Loading Whisper model: {self.model_name}...", 0)
-            QApplication.processEvents() # Allow GUI to update
-            try:
-                # Check cache first (example of simple caching)
-                # if self.model_name in WHISPER_MODEL_CACHE:
-                #     self.whisper_model = WHISPER_MODEL_CACHE[self.model_name]
-                # else:
-                #     self.whisper_model = whisper.load_model(self.model_name)
-                #     WHISPER_MODEL_CACHE[self.model_name] = self.whisper_model
-                # Simpler: Load every time worker runs
-                self.whisper_model = whisper.load_model(self.model_name)
-
-            except Exception as model_load_error:
-                self.error_occurred.emit(f"Failed to load Whisper model '{self.model_name}': {model_load_error}")
-                # Try to unload partially loaded model? Might not be possible/easy.
-                self.whisper_model = None
-                return # Cannot continue without a model
-            self.progress.emit(f"Model '{self.model_name}' loaded.", 0)
-
+            self._load_model()
 
             # --- Create Temp Directory ---
             self.temp_dir_path.mkdir(parents=True, exist_ok=True)
@@ -171,65 +215,10 @@ class Worker(QThread):
                 if not self._is_running:
                     self.progress.emit("Processing cancelled.", int((idx / total_files) * 100))
                     break
-
-                progress_text = f'Processing: {audio_file.name} ({idx + 1}/{total_files})'
-                self.progress.emit(progress_text, int((idx / total_files) * 100))
-                QApplication.processEvents() # Ensure label updates before potentially long transcribe
-
-                expected_srt_file_path = self.temp_dir_path / (audio_file.stem + '.srt')
-                generated_lrc_path = None # Reset for each file
-
-                try:
-                    # --- Transcribe using Whisper library ---
-                    transcribe_options = {"language": self.language} # Add other options like fp16=False if needed
-                    result = self.whisper_model.transcribe(str(audio_file), **transcribe_options, verbose=False) # verbose=False suppresses console output
-
-                    # --- Generate SRT Content from Result ---
-                    srt_data = generate_srt_content(result)
-                    if not srt_data:
-                         self.error_occurred.emit(f"Whisper produced no output for {audio_file.name}")
-                         continue # Skip to next file
-
-                    # --- Write SRT to Temp File ---
-                    try:
-                        with open(expected_srt_file_path, 'w', encoding='utf-8') as srt_f:
-                            srt_f.write(srt_data)
-                    except IOError as io_err:
-                        self.error_occurred.emit(f"Failed to write temporary SRT file {expected_srt_file_path.name}: {io_err}")
-                        continue # Skip to next file
-
-                    # --- Convert SRT to LRC (using existing function) ---
-                    if expected_srt_file_path.exists():
-                        generated_lrc_path = srt_to_lrc.srt_to_lrc(expected_srt_file_path) # This deletes the SRT file
-
-                        if generated_lrc_path and generated_lrc_path.exists():
-                            target_lrc_path = audio_file.with_suffix('.lrc')
-                            try:
-                                shutil.move(str(generated_lrc_path), str(target_lrc_path))
-                            except Exception as move_err:
-                                self.error_occurred.emit(f"Failed to move {generated_lrc_path.name} to target: {move_err}")
-                        elif expected_srt_file_path.exists(): # Should have been deleted by srt_to_lrc
-                            self.error_occurred.emit(f"LRC conversion failed but SRT still exists for {audio_file.name}")
-                        else:
-                            self.error_occurred.emit(f"LRC file not generated for {audio_file.name} after SRT processing.")
-
-                    else:
-                        # This case should ideally not happen if SRT writing succeeded
-                        self.error_occurred.emit(f"Temporary SRT file disappeared before conversion for {audio_file.name}")
-
-                except Exception as e:
-                    self.error_occurred.emit(f"Error processing {audio_file.name}: {e}\n{traceback.format_exc()}")
-                    # Clean up potentially leftover temp files for this failed audio
-                    if expected_srt_file_path.exists():
-                        try: expected_srt_file_path.unlink()
-                        except OSError: pass
-                    if generated_lrc_path and generated_lrc_path.exists():
-                         try: generated_lrc_path.unlink()
-                         except OSError: pass
-                    continue # Skip to next file
-
+                self._process_file(audio_file, total_files, idx)
                 # Update progress after successful processing or handled error
-                self.progress.emit(progress_text, int(((idx + 1) / total_files) * 100))
+                self.progress.emit(f'Finished: {audio_file.name}', int(((idx + 1) / total_files) * 100))
+
 
         except Exception as e:
             # Catch errors during setup (e.g., model load, file scan)
@@ -241,12 +230,6 @@ class Worker(QThread):
                     shutil.rmtree(self.temp_dir_path)
                 except Exception as clean_err:
                      self.error_occurred.emit(f"Warning: Failed to delete temp directory {self.temp_dir_path}: {clean_err}")
-            # --- Unload model (optional, frees memory) ---
-            # If you want to free VRAM/RAM after processing:
-            # del self.whisper_model
-            # self.whisper_model = None
-            # import gc; gc.collect() # Try to force garbage collection
-            # Note: CUDA memory might need more specific handling if using GPU
 
             if self._is_running:
                 self.finished_signal.emit()
@@ -254,14 +237,12 @@ class Worker(QThread):
 
 # --- Main Application Window ---
 class App(QWidget):
-    # (Constructor __init__ remains the same)
     def __init__(self):
         super().__init__()
         self.worker = None
-        self.initUI()
+        self.init_ui()
 
-    # (initUI remains mostly the same, just remove whisper.exe mentions)
-    def initUI(self):
+    def init_ui(self):
         self.setWindowTitle("Audio to LRC Extractor (using Whisper Library)")
         icon_path = APP_BASE_DIR / "icon.png"
         if icon_path.exists():
@@ -281,7 +262,7 @@ class App(QWidget):
         form_layout = QFormLayout()
         self.folder_path_edit = QLineEdit()
         self.folder_path_edit.setPlaceholderText("Select folder containing audio files")
-        self.folder_path_edit.setText("C:/")
+        self.folder_path_edit.setText(str(Path.home()))
         self.select_folder_button = QPushButton("Select Folder...")
         self.select_folder_button.setFont(QFont("Arial", 10))
         self.select_folder_button.clicked.connect(self.select_folder)
@@ -333,7 +314,6 @@ class App(QWidget):
 
         self.setLayout(layout)
 
-    # (select_folder remains the same)
     def select_folder(self):
         start_dir = self.folder_path_edit.text()
         if not Path(start_dir).is_dir():
@@ -342,7 +322,6 @@ class App(QWidget):
         if folder:
             self.folder_path_edit.setText(folder)
 
-    # (log_message remains the same)
     def log_message(self, message: str):
         self.log_output.append(message)
         QApplication.processEvents()
@@ -381,7 +360,6 @@ class App(QWidget):
         self.worker.finished_signal.connect(self.worker_finished)
         self.worker.start()
 
-    # (stop_processing remains the same)
     def stop_processing(self):
          if self.worker and self.worker.isRunning():
             self.log_message("Attempting to stop processing (will finish current file)...")
@@ -389,20 +367,17 @@ class App(QWidget):
             self.stop_button.setEnabled(False)
             # Note: The actual transcription might continue until finished
 
-    # (update_progress remains the same)
     def update_progress(self, text, value):
         self.progress_label.setText(text)
         self.progress_bar.setValue(value)
         self.log_message(text)
 
-    # (handle_error remains the same)
     def handle_error(self, error_message):
         self.log_message(f"[ERROR] {error_message}")
         self.progress_label.setText("State: Error occurred (see log)")
         self.progress_label.setStyleSheet("color: red;")
 
 
-    # (worker_finished remains the same)
     def worker_finished(self):
         if self.worker and not self.worker._is_running:
              status_message = "State: Stopped by user."
@@ -418,7 +393,6 @@ class App(QWidget):
         self.set_controls_enabled(True)
         self.worker = None
 
-    # (set_controls_enabled remains the same)
     def set_controls_enabled(self, enabled: bool):
         self.start_button.setEnabled(enabled)
         self.select_folder_button.setEnabled(enabled)
@@ -427,7 +401,6 @@ class App(QWidget):
         self.language_input.setEnabled(enabled)
         self.stop_button.setEnabled(not enabled)
 
-    # (closeEvent remains the same)
     def closeEvent(self, event):
         if self.worker and self.worker.isRunning():
             reply = QMessageBox.question(self, 'Confirm Exit',
@@ -455,4 +428,3 @@ if __name__ == '__main__':
     window = App()
     window.show()
     sys.exit(app.exec_())
-

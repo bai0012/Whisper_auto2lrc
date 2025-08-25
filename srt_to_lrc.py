@@ -8,22 +8,22 @@ SRT_TIME_REGEX = re.compile(r'(\d{2}):(\d{2}):(\d{2}),(\d{3})')
 
 def convert_srt_time_to_lrc(time_string):
     """Converts SRT time format (HH:MM:SS,ms) to LRC time format [MM:SS.xx]."""
-    match = SRT_TIME_REGEX.match(time_string)
-    if not match:
-        # Handle potential variations or errors if necessary
-        # For simplicity, assume valid format for now
-        return "00:00.00" # Default or raise error
+    try:
+        match = SRT_TIME_REGEX.match(time_string)
+        if not match:
+            return "00:00.00" # Return a default for malformed strings
 
-    h, m, s, ms = map(int, match.groups())
-
-    total_seconds = h * 3600 + m * 60 + s + ms / 1000.0
+        h, m, s, ms = map(int, match.groups())
+        total_seconds = h * 3600 + m * 60 + s + ms / 1000.0
+    except (ValueError, AttributeError):
+        return "00:00.00" # Return default if parsing fails
 
     lrc_minutes = int(total_seconds // 60)
     lrc_seconds = total_seconds % 60
 
     # Format seconds to MM:SS.xx (centiseconds)
-    # {:05.2f} ensures leading zero for seconds < 10 and two decimal places
-    lrc_time_str = f"{lrc_minutes:02d}:{lrc_seconds:05.2f}"
+    # {:0>5.2f} ensures leading zero for seconds < 10 and two decimal places
+    lrc_time_str = f"{lrc_minutes:02d}:{lrc_seconds:0>5.2f}"
     return lrc_time_str
 
 def srt_to_lrc(srt_file_path: Path):
