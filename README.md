@@ -11,6 +11,8 @@
 
 Whisper_auto2lrc uses either OpenAI Whisper or Faster Whisper to convert all media files in a folder (and its subfolders) into one or more subtitle/transcript formats: LRC, SRT, VTT, TXT, TSV, and JSON. Existing output files are never overwritten.
 
+The project requires **Python 3.14**. Transcription and batch processing live in a pure-Python core with no Qt dependency; the PyQt6 desktop Worker and REST API are separate adapters around that shared core. Both entry points therefore use the same scanning, progress, cancellation, model-cache, and output behavior.
+
 The application provides a PyQt6 desktop interface and supports two interchangeable transcription backends:
 
 - **OpenAI Whisper** uses PyTorch and the system FFmpeg executable.
@@ -30,9 +32,9 @@ It is suitable for users who need to transcribe a large number of audio files in
 
 ## How to install
 
-First, install Python, which has been tested on Python 3.11
+First, install Python 3.14. Dependency resolution, automated tests, and Windows release builds use Python 3.14.
 
-Both supported transcription backends are installed by `requirements.txt`.
+`requirements.txt` installs the desktop UI and both transcription backends. If the desktop UI is not needed, `requirements-api.txt` intentionally omits PyQt6.
 
 ## How to use
 
@@ -79,6 +81,8 @@ pip install -r requirements-api.txt
 python api.py
 ```
 
+The API dependency set does not install PyQt6. It calls the pure-Python transcription core directly, so headless servers and containers do not need Qt runtime libraries.
+
 The default address is `http://127.0.0.1:8000`; use `--host` and `--port` to change it. Submit a recursive folder job, then poll its status:
 
 ```bash
@@ -102,13 +106,15 @@ The tests use fake Whisper models and do not require real audio files or model d
 
 ```Powershell
 pip install -r requirements-dev.txt
-python -m ruff check main.py api.py tests
+python -m ruff check core.py main.py api.py tests
 python -m pytest -s tests
 ```
 
 ### Windows release package
 
-GitHub releases provide `Whisper_auto2lrc-windows-x64.zip`. It is a PyInstaller **onedir** build: extract the entire archive, keep all bundled files together, and launch `Whisper_auto2lrc.exe` from the extracted folder. The directory layout is intentional and avoids the startup and temporary-extraction overhead of a one-file executable.
+GitHub releases provide a versioned `Whisper_auto2lrc-vX.Y.Z-windows-x64.zip`. It is a PyInstaller **onedir** build: extract the entire archive, keep all bundled files together, and launch `Whisper_auto2lrc.exe` from the extracted folder. The directory layout is intentional and avoids the startup and temporary-extraction overhead of a one-file executable.
+
+Maintainers can open **Build and Release** in GitHub Actions, choose **Run workflow**, enter `1.2.3` or `v1.2.3`, and optionally mark it as a prerelease. The workflow validates SemVer and rejects an existing tag, then runs Ruff and the complete test suite on Python 3.14, builds and smoke-tests the Windows package, creates the `v1.2.3` tag and GitHub Release, and uploads the versioned ZIP. The release is created only after every check and build step succeeds.
 
 ## Troubleshooting
 

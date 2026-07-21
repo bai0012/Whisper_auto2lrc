@@ -7,6 +7,8 @@
 
 使用 OpenAI Whisper 或 Faster Whisper 将文件夹（及子文件夹）中的媒体文件转换为一种或多种字幕/转录格式：LRC、SRT、VTT、TXT、TSV 和 JSON。已有输出文件不会被覆盖。
 
+项目要求 **Python 3.14**。转录与批处理逻辑位于纯 Python 核心层，不依赖 Qt；PyQt6 桌面 Worker 和 REST API 分别只是核心层的界面适配器。两种入口共享相同的扫描、进度、取消、模型缓存和输出逻辑。
+
 程序提供 PyQt6 桌面界面，并支持两个可切换的转录后端：
 
 - **OpenAI Whisper** 使用 PyTorch 和系统中的 FFmpeg 可执行文件。
@@ -25,9 +27,9 @@
 
 ## 如何安装
 
-首先安装python，已经在python3.11上测试
+首先安装 Python 3.14。本项目的依赖解析、自动测试和 Windows 发布构建均使用 Python 3.14。
 
-`requirements.txt` 会同时安装两个支持的转录后端。
+`requirements.txt` 会安装桌面界面和两个转录后端；不需要桌面界面时，可使用不包含 PyQt6 的 `requirements-api.txt`。
 
 ## 如何使用
 
@@ -75,6 +77,8 @@ pip install -r requirements-api.txt
 python api.py
 ```
 
+API 依赖不会安装 PyQt6。它直接调用纯 Python 转录核心，因此服务器和无图形界面的容器无需 Qt 运行库。
+
 默认监听 `http://127.0.0.1:8000`；可使用 `--host` 和 `--port` 修改。提交递归处理文件夹的任务，然后轮询状态：
 
 ```bash
@@ -98,13 +102,15 @@ curl -X POST http://127.0.0.1:8000/v1/jobs/JOB_ID/cancel
 
 ```Powershell
 pip install -r requirements-dev.txt
-python -m ruff check main.py api.py tests
+python -m ruff check core.py main.py api.py tests
 python -m pytest -s tests
 ```
 
 ### Windows 发布包
 
-GitHub Release 提供 `Whisper_auto2lrc-windows-x64.zip`。它是 PyInstaller 的 **onedir** 构建：请完整解压，保持目录内所有文件的位置不变，然后运行解压目录中的 `Whisper_auto2lrc.exe`。采用目录形式可以避免单文件程序启动时的临时解压开销。
+GitHub Release 提供带版本号的 `Whisper_auto2lrc-vX.Y.Z-windows-x64.zip`。它是 PyInstaller 的 **onedir** 构建：请完整解压，保持目录内所有文件的位置不变，然后运行解压目录中的 `Whisper_auto2lrc.exe`。采用目录形式可以避免单文件程序启动时的临时解压开销。
+
+维护者可在 GitHub Actions 的 **Build and Release** 页面选择 **Run workflow**，输入 `1.2.3` 或 `v1.2.3`，并按需勾选预发布。工作流会校验 SemVer、拒绝已存在的标签，随后在 Python 3.14 下执行 Ruff 和全部测试、构建及启动检查 Windows 包，最后创建 `v1.2.3` 标签和 GitHub Release，并上传带版本号的 ZIP。只有全部检查和构建成功后才会创建 Release。
 
 
 ## 疑难解答
