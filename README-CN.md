@@ -98,6 +98,20 @@ curl -X POST http://127.0.0.1:8000/v1/jobs/JOB_ID/cancel
 
 **安全警告：**API 没有身份验证，而且接受本地文件系统路径。请保留默认的本机回环监听地址。除非已部署带身份验证和访问控制的反向代理，并做好文件系统隔离，否则不要将它暴露到局域网或公网。
 
+### 命令行界面
+
+CLI 仅依赖纯 Python 核心，不安装 Qt 或 Web 框架：
+
+```bash
+pip install -r requirements-cli.txt
+python cli.py transcribe ./audio --backend faster-whisper -f lrc -f srt
+python cli.py transcribe ./audio --output-mode json
+python cli.py capabilities --json
+python cli.py --version
+```
+
+`text` 模式把进度写入 stderr，`quiet` 只保留错误和摘要，`json` 向 stdout 输出严格 UTF-8 JSON Lines。退出码分别表达成功（0）、部分失败（1）、参数错误（2）、运行失败（3）、内部错误（70）、SIGINT（130）和 SIGTERM（143）。完整参数与稳定输出协议见 [CLI 设计](docs/cli-design.md)。程序版本由 `version.py` 单一维护；发版前先更新该文件，再用同一版本运行发布工作流。
+
 ### 运行单元测试
 
 测试不需要下载 Whisper 模型，也不需要真实音频文件：

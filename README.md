@@ -102,6 +102,20 @@ Jobs use a single in-memory queue (maximum 100 waiting jobs) and run one at a ti
 
 **Security warning:** the API has no authentication and accepts local filesystem paths. Keep the default loopback address. Do not expose it to a LAN or the public Internet without an authenticated, access-controlled reverse proxy and suitable filesystem isolation.
 
+### Command-line interface
+
+The CLI depends only on the pure-Python core and installs neither Qt nor a web framework:
+
+```bash
+pip install -r requirements-cli.txt
+python cli.py transcribe ./audio --backend faster-whisper -f lrc -f srt
+python cli.py transcribe ./audio --output-mode json
+python cli.py capabilities --json
+python cli.py --version
+```
+
+`text` writes progress to stderr, `quiet` retains only errors and the summary, and `json` writes strict UTF-8 JSON Lines to stdout. Exit codes distinguish success (0), partial failure (1), invalid arguments (2), runtime failure (3), internal failure (70), SIGINT (130), and SIGTERM (143). See the [CLI design](docs/cli-design.md) for the complete argument and output contract. `version.py` is the single version source: update it first, then dispatch the release workflow with the same version.
+
 ### Running the unit tests
 
 The tests use fake Whisper models and do not require real audio files or model downloads:

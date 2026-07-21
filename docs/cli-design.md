@@ -1,9 +1,9 @@
 # CLI 接口设计
 
-- 状态：提案
-- 目标版本：下一个功能版本
+- 状态：已实现
+- 目标版本：3.1.0
 - 适用 Python：3.14+
-- 入口文件：计划新增 `cli.py`
+- 入口文件：`cli.py`
 - 核心依赖：`core.TranscriptionRunner`
 
 ## 1. 背景与目标
@@ -368,13 +368,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 ## 13. 依赖与分发
 
 - CLI 使用两个 Whisper 后端，因此源码安装可复用 `requirements-core.txt`，不需要 PyQt6、FastAPI 或 Uvicorn。
-- 建议增加 `requirements-cli.txt`，首版内容只引用 `requirements-core.txt`；即使暂时没有额外依赖，也能明确安装意图。
+- `requirements-cli.txt` 只引用 `requirements-core.txt`；即使暂时没有额外依赖，也能明确 CLI 的安装意图。
 - PyInstaller 桌面包是否包含 CLI 不属于首版设计。若以后发布独立 CLI，可增加 console 模式构建，不能复用 `--windowed` 的桌面可执行文件。
-- `--version` 的值应来自单一版本源。实现前应新增轻量版本模块或包元数据，GitHub Actions 输入版本必须与该版本源校验一致，避免 CLI、tag 和 Release 显示不同版本。
+- `--version` 从无依赖的 `version.py` 读取。GitHub Actions 会校验输入版本与该文件一致，API 的 OpenAPI 版本也复用同一值，避免 CLI、API、tag 和 Release 显示不同版本。
 
 ## 14. 测试计划
 
-计划新增 `tests/test_cli.py`，测试不得下载模型或读取真实音频。
+实现位于 `tests/test_cli.py`，测试不得下载模型或读取真实音频。
 
 ### 14.1 解析和校验
 
@@ -416,15 +416,15 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 CI 应继续在 Python 3.14 下运行全部测试和 Ruff，并把 `cli.py` 加入 lint、编译和无 Qt 导入检查。
 
-## 15. 实施顺序与验收标准
+## 15. 实施记录与验收标准
 
-建议按以下顺序实施：
+首版已按以下顺序实现：
 
-1. 把后端运行依赖检查和能力对象生成提取到 `core.py`，为三个适配层提供统一入口。
-2. 新增 `cli.py` 的 parser、reporter、信号处理和退出码映射。
-3. 新增 `requirements-cli.txt` 和 `tests/test_cli.py`。
-4. 更新 CI、README 和 README-CN，加入安装与快速使用说明。
-5. 如需随 Release 分发，另行设计 console PyInstaller 产物和版本单一来源。
+1. 后端运行依赖检查和能力对象生成已提取到 `core.py`，供三个适配层复用。
+2. `cli.py` 已实现 parser、reporter、信号处理和退出码映射。
+3. 已新增 `requirements-cli.txt`、`version.py` 和 `tests/test_cli.py`。
+4. CI、Release workflow、README 和 README-CN 已加入 CLI 检查与使用说明。
+5. 当前 Windows Release 仍只构建桌面程序；独立 CLI 可执行文件属于后续分发设计。
 
 首版验收必须同时满足：
 
