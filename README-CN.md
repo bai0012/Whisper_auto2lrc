@@ -66,13 +66,39 @@ python main.py
 
 Faster Whisper 提供 `Auto`、`CPU` 和 `CUDA` 三种设备选项。`Auto` 会在 CTranslate2 检测到可用 CUDA 设备时使用 CUDA + FP16，否则使用 CPU + INT8；如果自动初始化 CUDA 失败，程序会重试 CPU + INT8，并在日志中报告回退。选择 `CPU` 可强制使用兼容性较好的路径，选择 `CUDA` 则要求使用 GPU。
 
+### REST 批处理 API
+
+安装 API 依赖并启动本地服务：
+
+```bash
+pip install -r requirements-api.txt
+python api.py
+```
+
+默认监听 `http://127.0.0.1:8000`；可使用 `--host` 和 `--port` 修改。提交递归处理文件夹的任务，然后轮询状态：
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"folder_path":"/data/audio","backend":"faster-whisper","model":"base","language":"auto","formats":["lrc","srt"],"faster_device":"auto","faster_compute_type":"auto"}'
+
+curl http://127.0.0.1:8000/v1/jobs/JOB_ID
+curl -X POST http://127.0.0.1:8000/v1/jobs/JOB_ID/cancel
+```
+
+使用本地模型时，OpenAI Whisper 可增加 `"local_model_path":"/models/model.pt"`，Faster Whisper 则填写 CTranslate2 模型目录。`GET /v1/capabilities` 会列出有效的后端、模型、格式、语言、设备和精度。其他端点包括 `GET /health`、`GET /v1/jobs`、`GET /v1/jobs/{id}`；交互式 OpenAPI 文档位于 `/docs`。
+
+任务进入最多容纳 100 个等待任务的单一内存队列，并始终串行执行，避免多个任务同时占用显存。内存中最多保留最近 1,000 条任务记录；`GET /v1/jobs` 支持 `limit`（最大 200）和 `offset`。进程重启后任务及历史记录会丢失。取消采用协作式机制，因此运行中任务可能保持 `cancelling`，直至当前模型加载或媒体转录调用返回。关闭服务时会取消排队任务，并等待活动 Worker 安全结束。
+
+**安全警告：**API 没有身份验证，而且接受本地文件系统路径。请保留默认的本机回环监听地址。除非已部署带身份验证和访问控制的反向代理，并做好文件系统隔离，否则不要将它暴露到局域网或公网。
+
 ### 运行单元测试
 
 测试不需要下载 Whisper 模型，也不需要真实音频文件：
 
 ```Powershell
 pip install -r requirements-dev.txt
-python -m ruff check main.py tests
+python -m ruff check main.py api.py tests
 python -m pytest -s tests
 ```
 

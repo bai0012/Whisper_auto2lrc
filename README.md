@@ -70,13 +70,39 @@ The display language can be switched between English and Simplified Chinese at t
 
 Faster Whisper offers `Auto`, `CPU`, and `CUDA` device choices. `Auto` uses CUDA + FP16 when CTranslate2 detects a usable CUDA device and otherwise uses CPU + INT8. If automatic CUDA initialization fails, processing retries on CPU + INT8 and reports the fallback in the log. Choose `CPU` to force the portable path or `CUDA` to require GPU execution.
 
+### REST batch API
+
+Install the API dependencies and start the local service:
+
+```bash
+pip install -r requirements-api.txt
+python api.py
+```
+
+The default address is `http://127.0.0.1:8000`; use `--host` and `--port` to change it. Submit a recursive folder job, then poll its status:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"folder_path":"/data/audio","backend":"faster-whisper","model":"base","language":"auto","formats":["lrc","srt"],"faster_device":"auto","faster_compute_type":"auto"}'
+
+curl http://127.0.0.1:8000/v1/jobs/JOB_ID
+curl -X POST http://127.0.0.1:8000/v1/jobs/JOB_ID/cancel
+```
+
+For a local model, add `"local_model_path":"/models/model.pt"` for OpenAI Whisper or a CTranslate2 model directory for Faster Whisper. `GET /v1/capabilities` lists valid backends, models, formats, languages, devices, and precision choices. Other endpoints are `GET /health`, `GET /v1/jobs`, and `GET /v1/jobs/{id}`. Interactive OpenAPI documentation is available at `/docs`.
+
+Jobs use a single in-memory queue (maximum 100 waiting jobs) and run one at a time to avoid concurrent VRAM use. The latest 1,000 job records are retained in memory; `GET /v1/jobs` supports `limit` (maximum 200) and `offset`. Jobs and history are lost when the process restarts. Cancellation is cooperative, so a running job can remain `cancelling` until its current model load or media transcription returns. During shutdown, queued jobs are cancelled and the server waits for the active worker to finish safely.
+
+**Security warning:** the API has no authentication and accepts local filesystem paths. Keep the default loopback address. Do not expose it to a LAN or the public Internet without an authenticated, access-controlled reverse proxy and suitable filesystem isolation.
+
 ### Running the unit tests
 
 The tests use fake Whisper models and do not require real audio files or model downloads:
 
 ```Powershell
 pip install -r requirements-dev.txt
-python -m ruff check main.py tests
+python -m ruff check main.py api.py tests
 python -m pytest -s tests
 ```
 
