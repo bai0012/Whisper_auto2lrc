@@ -1,9 +1,4 @@
-PyQt5
-PyQt5_sip
-numba
-numpy
-torch
-tqdm
-more-itertools
-tiktoken
-ffmpeg-python
+PyQt6
+openai-whisper
+faster-whisper
+ctranslate2
