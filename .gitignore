@@ -3,4 +3,5 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+.coverage
 .omc/

@@ -30,7 +30,13 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Lint
-        run: python -m ruff check core.py main.py api.py tests
+        run: python -m ruff check core.py main.py api.py cli.py version.py tests
+
+      - name: Compile Python entry points
+        run: python -m py_compile core.py main.py api.py cli.py version.py
 
       - name: Run unit tests
         run: python -m pytest -s tests
+
+      - name: Verify headless CLI import
+        run: python -c "import cli, sys; assert not {'PyQt6', 'fastapi', 'uvicorn'} & sys.modules.keys()"

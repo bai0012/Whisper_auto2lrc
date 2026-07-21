@@ -51,6 +51,10 @@ jobs:
             throw "Version must be SemVer, for example 1.2.3, v1.2.3, or 1.2.3-rc.1."
           }
           $version = $inputVersion -replace '^v', ''
+          $sourceVersion = python -c "from version import __version__; print(__version__)"
+          if ($version -ne $sourceVersion) {
+            throw "Release version $version does not match version.py ($sourceVersion)."
+          }
           $tag = "v$version"
           git fetch --tags --force
           if ($LASTEXITCODE -ne 0) {
@@ -63,6 +67,13 @@ jobs:
           if ($LASTEXITCODE -ne 1) {
             throw "Could not check whether tag $tag already exists."
           }
+          git show-ref --verify --quiet "refs/tags/$version"
+          if ($LASTEXITCODE -eq 0) {
+            throw "Legacy tag $version already exists. Choose a new version."
+          }
+          if ($LASTEXITCODE -ne 1) {
+            throw "Could not check whether legacy tag $version already exists."
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "archive=Whisper_auto2lrc-$tag-windows-x64.zip" >> $env:GITHUB_OUTPUT
@@ -73,7 +84,10 @@ jobs:
           python -m pip install -r requirements-release.txt
 
       - name: Lint
-        run: python -m ruff check core.py main.py api.py tests
+        run: python -m ruff check core.py main.py api.py cli.py version.py tests
+
+      - name: Compile Python entry points
+        run: python -m py_compile core.py main.py api.py cli.py version.py
 
       - name: Run unit tests
         run: python -m pytest -s tests
