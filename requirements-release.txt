@@ -1,10 +1,11 @@
-# Versions exercised by the Windows release workflow. Runtime transitive
-# dependencies remain owned by the two Whisper backends.
+# Direct dependency versions exercised by the Python 3.14 Windows release workflow.
 PyQt6==6.11.0
 openai-whisper==20250625
 faster-whisper==1.2.1
 ctranslate2==4.8.1
 av==18.0.0
-pytest>=8,<9
+fastapi==0.116.1
+httpx==0.28.1
+pytest==8.4.2
 ruff==0.15.22
 PyInstaller==6.21.0

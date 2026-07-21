@@ -1,4 +1,2 @@
+-r requirements-core.txt
 PyQt6
-openai-whisper
-faster-whisper
-ctranslate2

@@ -1,11 +1,26 @@
 name: Build and Release
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (for example 1.2.3 or v1.2.3)
+        required: true
+        type: string
+      prerelease:
+        description: Mark the GitHub release as a prerelease
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
+
+concurrency:
+  # Serialize all releases so equivalent inputs such as 1.2.3 and v1.2.3
+  # cannot race after they normalize to the same tag.
+  group: release
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -18,20 +33,47 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements*.txt
+
+      - name: Validate release version
+        id: version
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $inputVersion = $env:RELEASE_VERSION
+          $semver = '^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$'
+          if ($inputVersion -notmatch $semver) {
+            throw "Version must be SemVer, for example 1.2.3, v1.2.3, or 1.2.3-rc.1."
+          }
+          $version = $inputVersion -replace '^v', ''
+          $tag = "v$version"
+          git fetch --tags --force
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not fetch existing Git tags."
+          }
+          git show-ref --verify --quiet "refs/tags/$tag"
+          if ($LASTEXITCODE -eq 0) {
+            throw "Tag $tag already exists. Choose a new version."
+          }
+          if ($LASTEXITCODE -ne 1) {
+            throw "Could not check whether tag $tag already exists."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "archive=Whisper_auto2lrc-$tag-windows-x64.zip" >> $env:GITHUB_OUTPUT
 
       - name: Install pinned release dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-release.txt
-          python -m pip install -r requirements-dev.txt
 
       - name: Lint
-        run: python -m ruff check main.py api.py tests
+        run: python -m ruff check core.py main.py api.py tests
 
       - name: Run unit tests
         run: python -m pytest -s tests
@@ -70,13 +112,32 @@ jobs:
 
       - name: Create Windows ZIP
         shell: pwsh
-        run: >-
-          Compress-Archive
-          -Path dist/Whisper_auto2lrc/*
-          -DestinationPath dist/Whisper_auto2lrc-windows-x64.zip
+        run: |
+          Compress-Archive `
+            -Path dist/Whisper_auto2lrc/* `
+            -DestinationPath "dist/${{ steps.version.outputs.archive }}"
 
-      - name: Upload release asset
+      - name: Atomically publish release tag
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag $env:RELEASE_TAG $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not create local tag $env:RELEASE_TAG."
+          }
+          git push origin "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not publish $env:RELEASE_TAG; the tag may have been created concurrently."
+          }
+
+      - name: Create GitHub release and upload asset
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: dist/Whisper_auto2lrc-windows-x64.zip
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Whisper_auto2lrc ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          files: dist/${{ steps.version.outputs.archive }}

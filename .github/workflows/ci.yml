@@ -18,9 +18,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements*.txt
 
@@ -30,7 +30,7 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Lint
-        run: python -m ruff check main.py api.py tests
+        run: python -m ruff check core.py main.py api.py tests
 
       - name: Run unit tests
         run: python -m pytest -s tests

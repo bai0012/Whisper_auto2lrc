@@ -1,3 +1,6 @@
-#ignore temp folder
+# Ignore local runtime and development artifacts.
 /temp
-__pycache__
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.omc/
