@@ -114,6 +114,7 @@ def test_worker_reports_loaded_then_cached_model(tmp_path, monkeypatch):
         "whisper",
         SimpleNamespace(load_model=lambda name: calls.append(name) or model),
     )
+    monkeypatch.setattr(core.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
     (tmp_path / "song.mp3").touch()
 
     first_messages = []
@@ -133,12 +134,13 @@ def test_worker_reports_loaded_then_cached_model(tmp_path, monkeypatch):
 
 def test_worker_model_load_failure_is_failed_and_uncached(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        main,
+        core,
         "whisper",
         SimpleNamespace(
             load_model=lambda _name: (_ for _ in ()).throw(RuntimeError("bad"))
         ),
     )
+    monkeypatch.setattr(core.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
     (tmp_path / "song.mp3").touch()
     errors = []
     worker = main.Worker(tmp_path, "base", "auto", "en")

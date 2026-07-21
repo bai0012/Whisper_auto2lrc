@@ -17,6 +17,7 @@ def install_fake_whisper(monkeypatch, model):
     monkeypatch.setattr(
         core, "whisper", SimpleNamespace(load_model=lambda _name: model)
     )
+    monkeypatch.setattr(core.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
 
 
 def test_worker_honors_stop_requested_before_thread_starts(tmp_path, monkeypatch):

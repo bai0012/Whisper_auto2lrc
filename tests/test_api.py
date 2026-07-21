@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import api
+from version import __version__
 
 
 class FakeWorker:
@@ -276,7 +277,14 @@ def test_api_endpoints_and_errors(tmp_path):
         }
         capabilities = client.get("/v1/capabilities").json()
         assert "openai-whisper" in capabilities["backends"]
+        assert capabilities["backends"]["openai-whisper"]["default_model"] == "base"
+        assert capabilities["backends"]["openai-whisper"]["local_model"] == "file"
+        assert capabilities["backends"]["faster-whisper"]["local_model"] == "directory"
         assert "lrc" in capabilities["formats"]
+        assert capabilities["languages"][0] == "auto"
+        assert capabilities["faster_whisper"]["devices"] == ["auto", "cpu", "cuda"]
+        assert capabilities["queue_mode"] == "serial"
+        assert client.get("/openapi.json").json()["info"]["version"] == __version__
 
         response = client.post(
             "/v1/jobs",

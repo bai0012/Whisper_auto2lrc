@@ -1,5 +1,4 @@
 import os
-import shutil
 import sys
 import threading
 from pathlib import Path
@@ -121,6 +120,7 @@ TRANSLATIONS = {
         "using_cached_model": "Using cached {backend} model: {model}.",
         "model_loaded": "{backend} model '{model}' loaded and cached.",
         "model_load_failed": "Failed to load {backend} model '{model}': {error}",
+        "runtime_dependency_failed": "Cannot use {backend}: {error}",
         "faster_device": "Faster Whisper runtime: {device} / {compute_type}.",
         "faster_cpu_fallback": (
             "CUDA model loading failed ({error}). Auto mode is retrying once with CPU / int8."
@@ -213,6 +213,7 @@ TRANSLATIONS = {
         "using_cached_model": "正在使用已缓存的 {backend} 模型：{model}。",
         "model_loaded": "{backend} 模型“{model}”已加载并缓存。",
         "model_load_failed": "无法加载 {backend} 模型“{model}”：{error}",
+        "runtime_dependency_failed": "无法使用 {backend}：{error}",
         "faster_device": "Faster Whisper 运行配置：{device} / {compute_type}。",
         "faster_cpu_fallback": "CUDA 模型加载失败（{error}）。自动模式将使用 CPU / int8 重试一次。",
         "cancelled": "处理已取消。",
@@ -971,15 +972,19 @@ def check_backend_availability(
 def check_backend_dependencies(
     backend_name: str, locale_name: str
 ) -> tuple[str, str] | None:
-    availability_error = check_backend_availability(backend_name, locale_name)
-    if availability_error:
-        return availability_error
-    if backend_name == BACKEND_OPENAI and shutil.which("ffmpeg") is None:
-        return (
-            translate(locale_name, "startup_error"),
-            translate(locale_name, "startup_ffmpeg_missing"),
-        )
-    return None
+    runtime_error = core.validate_backend_runtime(backend_name)
+    if runtime_error is None:
+        return None
+    localized_keys = {
+        core.BACKEND_RUNTIME_ERRORS["whisper_missing"]: "whisper_missing",
+        core.BACKEND_RUNTIME_ERRORS["faster_whisper_missing"]: (
+            "faster_whisper_missing"
+        ),
+        core.BACKEND_RUNTIME_ERRORS["ffmpeg_missing"]: "startup_ffmpeg_missing",
+    }
+    message_key = localized_keys.get(runtime_error)
+    message = translate(locale_name, message_key) if message_key else runtime_error
+    return translate(locale_name, "startup_error"), message
 
 
 def check_runtime_dependencies(

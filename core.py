@@ -7,6 +7,7 @@ import gc
 import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -190,6 +191,55 @@ SUPPORTED_LANGUAGE_CODES = {
     "yue",
     "zh",
 }
+
+
+def capabilities() -> dict:
+    """Return a fresh, JSON-serializable description of supported options."""
+    return {
+        "backends": {
+            backend: {
+                "models": list(models),
+                "default_model": BACKEND_DEFAULT_MODELS[backend],
+                "local_model": "file" if backend == BACKEND_OPENAI else "directory",
+            }
+            for backend, models in BACKEND_MODELS.items()
+        },
+        "formats": list(OUTPUT_FORMATS),
+        "languages": ["auto", *sorted(SUPPORTED_LANGUAGE_CODES)],
+        "faster_whisper": {
+            "devices": list(FASTER_DEVICE_MODES),
+            "compute_types": {
+                device: list(compute_types)
+                for device, compute_types in FASTER_COMPUTE_TYPES.items()
+            },
+        },
+    }
+
+
+BACKEND_RUNTIME_ERRORS = {
+    "whisper_missing": "Could not import 'whisper'. Install openai-whisper.",
+    "ffmpeg_missing": "FFmpeg was not found in the system PATH.",
+    "faster_whisper_missing": (
+        "Could not import 'faster_whisper'. Install faster-whisper."
+    ),
+}
+
+
+def validate_backend_runtime(backend_name: str) -> str | None:
+    """Return an English runtime dependency error, or ``None`` when ready."""
+    if backend_name == BACKEND_OPENAI:
+        if whisper is None:
+            return BACKEND_RUNTIME_ERRORS["whisper_missing"]
+        if shutil.which("ffmpeg") is None:
+            return BACKEND_RUNTIME_ERRORS["ffmpeg_missing"]
+        return None
+    if backend_name == BACKEND_FASTER:
+        return (
+            BACKEND_RUNTIME_ERRORS["faster_whisper_missing"]
+            if FasterWhisperModel is None
+            else None
+        )
+    return f"Unsupported Whisper backend: {backend_name}"
 
 
 def resolved_model_reference(model_name: str, is_local_model: bool) -> str:
@@ -567,6 +617,7 @@ CORE_MESSAGES = {
         "using_cached_model": "Using cached {backend} model: {model}.",
         "model_loaded": "{backend} model '{model}' loaded and cached.",
         "model_load_failed": "Failed to load {backend} model '{model}': {error}",
+        "runtime_dependency_failed": "Cannot use {backend}: {error}",
         "faster_device": "Faster Whisper runtime: {device} / {compute_type}.",
         "faster_cpu_fallback": "CUDA model loading failed ({error}). Auto mode is retrying once with CPU / int8.",
         "conflict": "Multiple media files map to the same output name; all were skipped:\nOutput base: {target}\nSources:\n{sources}",
@@ -585,6 +636,7 @@ CORE_MESSAGES = {
         "using_cached_model": "正在使用已缓存的 {backend} 模型：{model}。",
         "model_loaded": "{backend} 模型“{model}”已加载并缓存。",
         "model_load_failed": "无法加载 {backend} 模型“{model}”：{error}",
+        "runtime_dependency_failed": "无法使用 {backend}：{error}",
         "faster_device": "Faster Whisper 运行配置：{device} / {compute_type}。",
         "faster_cpu_fallback": "CUDA 模型加载失败（{error}）。自动模式将使用 CPU / int8 重试一次。",
         "conflict": "多个媒体文件对应同一个输出名称，已全部跳过：\n输出基础名称：{target}\n来源：\n{sources}",
@@ -753,6 +805,17 @@ class TranscriptionRunner:
                 )
                 return self.completion_status
             label = backend_display_name(self.backend_name)
+            runtime_error = validate_backend_runtime(self.backend_name)
+            if runtime_error:
+                self.report_error(
+                    self.message(
+                        "runtime_dependency_failed",
+                        backend=label,
+                        error=runtime_error,
+                    )
+                )
+                self.completion_status = "failed"
+                return self.completion_status
             try:
                 self.whisper_model, cache_hit = self._load_model()
             except Exception as error:

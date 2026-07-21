@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 import core
+from version import __version__
 
 
 JobStatus = Literal[
@@ -367,7 +368,7 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
             manager.shutdown()
 
     api_app = FastAPI(
-        title="Whisper_auto2lrc Batch API", version="1.0.0", lifespan=lifespan
+        title="Whisper_auto2lrc Batch API", version=__version__, lifespan=lifespan
     )
     api_app.state.job_manager = manager
 
@@ -377,27 +378,9 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
 
     @api_app.get("/v1/capabilities")
     def capabilities():
-        return {
-            "backends": {
-                backend: {
-                    "models": list(models),
-                    "local_model": "file"
-                    if backend == core.BACKEND_OPENAI
-                    else "directory",
-                }
-                for backend, models in core.BACKEND_MODELS.items()
-            },
-            "formats": list(core.OUTPUT_FORMATS),
-            "languages": ["auto", *sorted(core.SUPPORTED_LANGUAGE_CODES)],
-            "faster_whisper": {
-                "devices": list(core.FASTER_DEVICE_MODES),
-                "compute_types": {
-                    key: list(values)
-                    for key, values in core.FASTER_COMPUTE_TYPES.items()
-                },
-            },
-            "queue_mode": "serial",
-        }
+        result = core.capabilities()
+        result["queue_mode"] = "serial"
+        return result
 
     @api_app.post(
         "/v1/jobs",

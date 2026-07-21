@@ -178,7 +178,7 @@ def test_local_model_language_is_not_assumed_english_only():
 def test_dependency_checks_are_backend_specific(monkeypatch):
     monkeypatch.setattr(core, "whisper", object())
     monkeypatch.setattr(core, "FasterWhisperModel", object())
-    monkeypatch.setattr(main.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(core.shutil, "which", lambda _name: None)
 
     assert main.check_backend_dependencies(main.BACKEND_OPENAI, "en") is not None
     assert main.check_backend_dependencies(main.BACKEND_FASTER, "en") is None
