@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import core
 import main
 
 
@@ -15,24 +16,26 @@ def test_backend_model_lists_include_backend_specific_models():
 
 def test_faster_runtime_uses_cuda_float16_when_cuda_is_available(monkeypatch):
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 1)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 1)
     )
     assert main.faster_whisper_runtime() == ("cuda", "float16")
 
 
 def test_faster_runtime_uses_cpu_int8_without_cuda(monkeypatch):
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
     )
     assert main.faster_whisper_runtime() == ("cpu", "int8")
 
 
 def test_faster_runtime_falls_back_to_cpu_if_cuda_probe_fails(monkeypatch):
     monkeypatch.setattr(
-        main,
+        core,
         "ctranslate2",
         SimpleNamespace(
-            get_cuda_device_count=lambda: (_ for _ in ()).throw(RuntimeError("probe failed"))
+            get_cuda_device_count=lambda: (_ for _ in ()).throw(
+                RuntimeError("probe failed")
+            )
         ),
     )
     assert main.faster_whisper_runtime() == ("cpu", "int8")
@@ -52,9 +55,9 @@ def test_faster_adapter_loads_with_runtime_and_consumes_segments(monkeypatch):
 
             return generated_segments(), SimpleNamespace(language="en")
 
-    monkeypatch.setattr(main, "FasterWhisperModel", FakeWhisperModel)
+    monkeypatch.setattr(core, "FasterWhisperModel", FakeWhisperModel)
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
     )
     backend = main.FasterWhisperBackend()
     model = backend.load_model("distil-large-v3")
@@ -80,11 +83,14 @@ def test_openai_adapter_preserves_result_and_auto_language(monkeypatch):
         transcribe=lambda path, **options: calls.append((path, options)) or expected
     )
     monkeypatch.setattr(
-        main, "whisper", SimpleNamespace(load_model=lambda _name: model)
+        core, "whisper", SimpleNamespace(load_model=lambda _name: model)
     )
     backend = main.OpenAIWhisperBackend()
 
-    assert backend.transcribe(backend.load_model("base"), Path("song.mp3"), None) is expected
+    assert (
+        backend.transcribe(backend.load_model("base"), Path("song.mp3"), None)
+        is expected
+    )
     assert calls == [("song.mp3", {"language": None, "verbose": False})]
 
 
@@ -93,7 +99,7 @@ def test_openai_adapter_loads_resolved_local_checkpoint(tmp_path, monkeypatch):
     checkpoint.touch()
     calls = []
     monkeypatch.setattr(
-        main, "whisper", SimpleNamespace(load_model=lambda value: calls.append(value))
+        core, "whisper", SimpleNamespace(load_model=lambda value: calls.append(value))
     )
 
     main.OpenAIWhisperBackend().load_model(str(checkpoint), is_local_model=True)
@@ -112,9 +118,9 @@ def test_faster_adapter_disables_download_for_local_ctranslate2_dir(
         def __init__(self, model_name, **options):
             calls.append((model_name, options))
 
-    monkeypatch.setattr(main, "FasterWhisperModel", FakeWhisperModel)
+    monkeypatch.setattr(core, "FasterWhisperModel", FakeWhisperModel)
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
     )
 
     main.FasterWhisperBackend().load_model(str(model_dir), is_local_model=True)
@@ -133,7 +139,7 @@ def test_faster_adapter_disables_download_for_local_ctranslate2_dir(
 
 def test_cache_key_isolated_by_backend_and_faster_runtime(monkeypatch):
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
     )
     openai_key = main.OpenAIWhisperBackend().cache_key("base")
     faster_key = main.FasterWhisperBackend().cache_key("base")
@@ -145,14 +151,12 @@ def test_cache_key_isolated_by_backend_and_faster_runtime(monkeypatch):
 
 def test_local_model_cache_key_uses_resolved_path(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
     )
     model_dir = tmp_path / "models" / "local"
     relative_path = model_dir.parent / ".." / "models" / "local"
 
-    key = main.FasterWhisperBackend().cache_key(
-        str(relative_path), is_local_model=True
-    )
+    key = main.FasterWhisperBackend().cache_key(str(relative_path), is_local_model=True)
 
     assert key == (
         main.BACKEND_FASTER,
@@ -172,21 +176,23 @@ def test_local_model_language_is_not_assumed_english_only():
 
 
 def test_dependency_checks_are_backend_specific(monkeypatch):
-    monkeypatch.setattr(main, "whisper", object())
-    monkeypatch.setattr(main, "FasterWhisperModel", object())
+    monkeypatch.setattr(core, "whisper", object())
+    monkeypatch.setattr(core, "FasterWhisperModel", object())
     monkeypatch.setattr(main.shutil, "which", lambda _name: None)
 
     assert main.check_backend_dependencies(main.BACKEND_OPENAI, "en") is not None
     assert main.check_backend_dependencies(main.BACKEND_FASTER, "en") is None
 
-    monkeypatch.setattr(main, "whisper", None)
-    monkeypatch.setattr(main, "FasterWhisperModel", None)
-    assert "openai-whisper" in main.check_backend_dependencies(
-        main.BACKEND_OPENAI, "en"
-    )[1]
-    assert "faster-whisper" in main.check_backend_dependencies(
-        main.BACKEND_FASTER, "en"
-    )[1]
+    monkeypatch.setattr(core, "whisper", None)
+    monkeypatch.setattr(core, "FasterWhisperModel", None)
+    assert (
+        "openai-whisper"
+        in main.check_backend_dependencies(main.BACKEND_OPENAI, "en")[1]
+    )
+    assert (
+        "faster-whisper"
+        in main.check_backend_dependencies(main.BACKEND_FASTER, "en")[1]
+    )
 
 
 def test_worker_uses_faster_backend_and_writes_normalized_output(tmp_path, monkeypatch):
@@ -202,9 +208,9 @@ def test_worker_uses_faster_backend_and_writes_normalized_output(tmp_path, monke
                 [SimpleNamespace(start=1.0, end=2.25, text=" faster result")]
             ), SimpleNamespace(language="en")
 
-    monkeypatch.setattr(main, "FasterWhisperModel", FakeWhisperModel)
+    monkeypatch.setattr(core, "FasterWhisperModel", FakeWhisperModel)
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 0)
     )
     source = tmp_path / "song.mp3"
     source.touch()
@@ -244,9 +250,9 @@ def test_auto_cuda_load_failure_retries_cpu_and_caches_actual_runtime(
                 [SimpleNamespace(start=0.0, end=1.0, text=" fallback")]
             ), SimpleNamespace(language="en")
 
-    monkeypatch.setattr(main, "FasterWhisperModel", FakeWhisperModel)
+    monkeypatch.setattr(core, "FasterWhisperModel", FakeWhisperModel)
     monkeypatch.setattr(
-        main, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 1)
+        core, "ctranslate2", SimpleNamespace(get_cuda_device_count=lambda: 1)
     )
     (tmp_path / "song.mp3").touch()
     messages = []
@@ -284,7 +290,7 @@ def test_explicit_cuda_load_failure_does_not_fallback(tmp_path, monkeypatch):
             load_calls.append((model_name, options))
             raise RuntimeError("CUDA failed")
 
-    monkeypatch.setattr(main, "FasterWhisperModel", FailingWhisperModel)
+    monkeypatch.setattr(core, "FasterWhisperModel", FailingWhisperModel)
     (tmp_path / "song.mp3").touch()
     errors = []
     worker = main.Worker(
@@ -300,7 +306,5 @@ def test_explicit_cuda_load_failure_does_not_fallback(tmp_path, monkeypatch):
     worker.run()
 
     assert worker.completion_status == "failed"
-    assert load_calls == [
-        ("base", {"device": "cuda", "compute_type": "int8_float16"})
-    ]
+    assert load_calls == [("base", {"device": "cuda", "compute_type": "int8_float16"})]
     assert "Failed to load" in errors[0]

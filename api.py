@@ -15,7 +15,7 @@ from typing import Callable, Literal
 from fastapi import FastAPI, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-import main
+import core
 
 
 JobStatus = Literal[
@@ -44,7 +44,7 @@ class JobOptions(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     folder_path: str = Field(min_length=1)
-    backend: Literal[main.BACKEND_OPENAI, main.BACKEND_FASTER] = main.DEFAULT_BACKEND
+    backend: Literal[core.BACKEND_OPENAI, core.BACKEND_FASTER] = core.DEFAULT_BACKEND
     model: str = Field(default="base", min_length=1)
     language: str = "auto"
     formats: list[Literal["lrc", "srt", "vtt", "txt", "tsv", "json"]] = Field(
@@ -71,31 +71,30 @@ class JobRequest(JobOptions):
 
         is_local = self.local_model_path is not None
         if is_local:
-            local_error = main.validate_local_model_path(
-                self.backend, self.local_model_path or "", self.locale
+            local_error = core.validate_local_model(
+                self.backend, self.local_model_path or ""
             )
             if local_error:
-                raise ValueError(local_error[1])
-            self.local_model_path = main.resolved_model_reference(
+                raise ValueError(local_error)
+            self.local_model_path = core.resolved_model_reference(
                 self.local_model_path or "", True
             )
-        elif self.model not in main.BACKEND_MODELS[self.backend]:
+        elif self.model not in core.BACKEND_MODELS[self.backend]:
             raise ValueError(
                 f"model '{self.model}' is not supported by backend '{self.backend}'"
             )
 
         effective_model = self.local_model_path if is_local else self.model
-        language_error = main.validate_transcription_language(
+        language_error = core.validate_language(
             effective_model or self.model,
             self.language,
-            self.locale,
             is_local_model=is_local,
         )
         if language_error:
-            raise ValueError(language_error[1])
+            raise ValueError(language_error)
         self.language = self.language.lower() or "auto"
 
-        legal_compute_types = main.FASTER_COMPUTE_TYPES[self.faster_device]
+        legal_compute_types = core.FASTER_COMPUTE_TYPES[self.faster_device]
         if (
             self.faster_compute_type != "auto"
             and self.faster_compute_type not in legal_compute_types
@@ -139,7 +138,7 @@ class JobRecord:
         return asdict(self)
 
 
-WorkerFactory = Callable[..., main.Worker]
+RunnerFactory = Callable[..., core.TranscriptionRunner]
 
 
 class JobManager:
@@ -147,7 +146,7 @@ class JobManager:
 
     def __init__(
         self,
-        worker_factory: WorkerFactory = main.Worker,
+        runner_factory: RunnerFactory = core.TranscriptionRunner,
         max_queue_size: int = 100,
         max_errors_per_job: int = 100,
         max_history: int = 1000,
@@ -158,7 +157,7 @@ class JobManager:
             raise ValueError("max_errors_per_job must be at least 1")
         if max_history <= max_queue_size:
             raise ValueError("max_history must be larger than max_queue_size")
-        self._worker_factory = worker_factory
+        self._runner_factory = runner_factory
         self.max_queue_size = max_queue_size
         self.max_errors_per_job = max_errors_per_job
         self.max_history = max_history
@@ -167,7 +166,7 @@ class JobManager:
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
         self._active_job_id: str | None = None
-        self._active_worker: main.Worker | None = None
+        self._active_runner: core.TranscriptionRunner | None = None
         self._stopping = False
 
     def start(self) -> None:
@@ -224,8 +223,8 @@ class JobManager:
             elif record.status in {"running", "cancelling"}:
                 record.status = "cancelling"
                 record.message = "Cancellation requested"
-                if self._active_job_id == job_id and self._active_worker:
-                    self._active_worker.stop()
+                if self._active_job_id == job_id and self._active_runner:
+                    self._active_runner.stop()
             return record.snapshot()
 
     def shutdown(self, timeout: float | None = None) -> None:
@@ -242,8 +241,8 @@ class JobManager:
                 if active_record.status == "running":
                     active_record.status = "cancelling"
                     active_record.message = "Cancellation requested during shutdown"
-            if self._active_worker:
-                self._active_worker.stop()
+            if self._active_runner:
+                self._active_runner.stop()
             self._condition.notify_all()
             thread = self._thread
         if thread and thread is not threading.current_thread():
@@ -266,7 +265,7 @@ class JobManager:
             self._run_job(job_id)
             with self._condition:
                 self._active_job_id = None
-                self._active_worker = None
+                self._active_runner = None
 
     def _run_job(self, job_id: str) -> None:
         with self._condition:
@@ -275,31 +274,29 @@ class JobManager:
         is_local = options["local_model_path"] is not None
         model_name = options["local_model_path"] if is_local else options["model"]
         try:
-            worker = self._worker_factory(
+            runner = self._runner_factory(
                 folder_path=Path(options["folder_path"]),
                 model_name=model_name,
                 language=options["language"],
-                locale_name=options["locale"],
                 output_formats=options["formats"],
                 backend_name=options["backend"],
                 faster_device_mode=options["faster_device"],
                 faster_compute_type=options["faster_compute_type"],
                 is_local_model=is_local,
+                progress_callback=lambda message, progress: self._record_progress(
+                    job_id, message, progress
+                ),
+                error_callback=lambda message: self._record_error(job_id, message),
+                message_formatter=core.core_message_formatter(options["locale"]),
             )
             with self._condition:
-                self._active_worker = worker
+                self._active_runner = runner
                 cancelling = record.status == "cancelling" or self._stopping
-            worker.progress.connect(
-                lambda message, progress: self._record_progress(job_id, message, progress)
-            )
-            worker.error_occurred.connect(
-                lambda message: self._record_error(job_id, message)
-            )
             if cancelling:
-                worker.stop()
+                runner.stop()
             # Calling run() in this consumer thread preserves strict serialization.
-            worker.run()
-            completion_status = worker.completion_status
+            runner.run()
+            completion_status = runner.completion_status
         except Exception as error:
             completion_status = "failed"
             self._record_error(job_id, str(error))
@@ -310,7 +307,9 @@ class JobManager:
                 completion_status = "cancelled"
             if completion_status not in TERMINAL_STATUSES:
                 completion_status = "failed"
-                self._append_error(record, "Worker returned an invalid completion status")
+                self._append_error(
+                    record, "Worker returned an invalid completion status"
+                )
             record.status = completion_status
             if completion_status.startswith("completed"):
                 record.progress = 100
@@ -327,7 +326,7 @@ class JobManager:
         with self._condition:
             record = self._jobs[job_id]
             record.message = str(message)
-            record.progress = max(0, min(100, int(progress)))
+            record.progress = max(record.progress, max(0, min(100, int(progress))))
 
     def _record_error(self, job_id: str, message: str) -> None:
         with self._condition:
@@ -383,18 +382,18 @@ def create_app(job_manager: JobManager | None = None) -> FastAPI:
                 backend: {
                     "models": list(models),
                     "local_model": "file"
-                    if backend == main.BACKEND_OPENAI
+                    if backend == core.BACKEND_OPENAI
                     else "directory",
                 }
-                for backend, models in main.BACKEND_MODELS.items()
+                for backend, models in core.BACKEND_MODELS.items()
             },
-            "formats": list(main.OUTPUT_FORMATS),
-            "languages": ["auto", *sorted(main.SUPPORTED_LANGUAGE_CODES)],
+            "formats": list(core.OUTPUT_FORMATS),
+            "languages": ["auto", *sorted(core.SUPPORTED_LANGUAGE_CODES)],
             "faster_whisper": {
-                "devices": list(main.FASTER_DEVICE_MODES),
+                "devices": list(core.FASTER_DEVICE_MODES),
                 "compute_types": {
                     key: list(values)
-                    for key, values in main.FASTER_COMPUTE_TYPES.items()
+                    for key, values in core.FASTER_COMPUTE_TYPES.items()
                 },
             },
             "queue_mode": "serial",

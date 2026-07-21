@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import core
 import main
 
 
@@ -14,8 +15,21 @@ class FakeModel:
 
 def install_fake_whisper(monkeypatch, model):
     monkeypatch.setattr(
-        main, "whisper", SimpleNamespace(load_model=lambda _name: model)
+        core, "whisper", SimpleNamespace(load_model=lambda _name: model)
     )
+
+
+def test_worker_honors_stop_requested_before_thread_starts(tmp_path, monkeypatch):
+    (tmp_path / "song.mp3").touch()
+    model = FakeModel()
+    install_fake_whisper(monkeypatch, model)
+    worker = main.Worker(tmp_path, "base", "auto")
+
+    worker.stop()
+    worker.run()
+
+    assert worker.completion_status == "cancelled"
+    assert model.calls == []
 
 
 def test_worker_skips_conflicting_sources_and_reports_them(tmp_path, monkeypatch):
@@ -80,7 +94,10 @@ def test_worker_transcribes_once_and_writes_all_selected_formats(tmp_path, monke
     model = FakeModel()
     model.transcribe = lambda path, **options: (
         model.calls.append((path, options))
-        or {"text": "lyrics", "segments": [{"start": 0.5, "end": 1.75, "text": "lyrics"}]}
+        or {
+            "text": "lyrics",
+            "segments": [{"start": 0.5, "end": 1.75, "text": "lyrics"}],
+        }
     )
     install_fake_whisper(monkeypatch, model)
     source = tmp_path / "song.mp3"
@@ -103,7 +120,11 @@ def test_worker_transcribes_once_and_writes_all_selected_formats(tmp_path, monke
     )
     assert (tmp_path / "song.vtt").read_text(encoding="utf-8").startswith("WEBVTT\n\n")
     assert (tmp_path / "song.txt").read_text(encoding="utf-8") == "lyrics\n"
-    assert (tmp_path / "song.tsv").read_text(encoding="utf-8").startswith("start\tend\ttext\n")
+    assert (
+        (tmp_path / "song.tsv")
+        .read_text(encoding="utf-8")
+        .startswith("start\tend\ttext\n")
+    )
     assert '"text": "lyrics"' in (tmp_path / "song.json").read_text(encoding="utf-8")
 
 
@@ -118,9 +139,7 @@ def test_worker_only_creates_missing_selected_formats(tmp_path, monkeypatch):
     existing = tmp_path / "song.lrc"
     existing.write_text("keep me", encoding="utf-8")
 
-    worker = main.Worker(
-        tmp_path, "base", "auto", "en", output_formats=("lrc", "srt")
-    )
+    worker = main.Worker(tmp_path, "base", "auto", "en", output_formats=("lrc", "srt"))
     worker.run()
 
     assert len(model.calls) == 1
@@ -143,9 +162,7 @@ def test_worker_reports_output_that_appears_and_writes_remaining_format(
     model = TargetAppearingModel()
     install_fake_whisper(monkeypatch, model)
     errors = []
-    worker = main.Worker(
-        tmp_path, "base", "auto", "en", output_formats=("lrc", "srt")
-    )
+    worker = main.Worker(tmp_path, "base", "auto", "en", output_formats=("lrc", "srt"))
     worker.error_occurred.connect(errors.append)
     worker.run()
 
@@ -162,9 +179,7 @@ def test_worker_skips_same_stem_conflict_for_non_lrc_output(tmp_path, monkeypatc
     (tmp_path / "song.wav").touch()
 
     errors = []
-    worker = main.Worker(
-        tmp_path, "base", "auto", "en", output_formats=("srt", "vtt")
-    )
+    worker = main.Worker(tmp_path, "base", "auto", "en", output_formats=("srt", "vtt"))
     worker.error_occurred.connect(errors.append)
     worker.run()
 
@@ -207,9 +222,7 @@ def test_worker_does_not_load_model_when_all_selected_outputs_exist(
     (tmp_path / "song.lrc").write_text("existing", encoding="utf-8")
     (tmp_path / "song.srt").write_text("existing", encoding="utf-8")
 
-    worker = main.Worker(
-        tmp_path, "base", "auto", "en", output_formats=("lrc", "srt")
-    )
+    worker = main.Worker(tmp_path, "base", "auto", "en", output_formats=("lrc", "srt"))
     worker.run()
 
     assert worker.completion_status == "completed"

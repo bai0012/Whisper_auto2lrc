@@ -9,18 +9,6 @@ from pydantic import ValidationError
 import api
 
 
-class FakeSignal:
-    def __init__(self):
-        self.callback = None
-
-    def connect(self, callback):
-        self.callback = callback
-
-    def emit(self, *args):
-        if self.callback:
-            self.callback(*args)
-
-
 class FakeWorker:
     running_count = 0
     max_running_count = 0
@@ -28,8 +16,8 @@ class FakeWorker:
 
     def __init__(self, **options):
         self.options = options
-        self.progress = FakeSignal()
-        self.error_occurred = FakeSignal()
+        self.progress_callback = options["progress_callback"]
+        self.error_callback = options["error_callback"]
         self.completion_status = "running"
         self.stopped = False
 
@@ -42,7 +30,7 @@ class FakeWorker:
             type(self).max_running_count = max(
                 type(self).max_running_count, type(self).running_count
             )
-        self.progress.emit("Processing", 50)
+        self.progress_callback("Processing", 50)
         time.sleep(0.02)
         self.completion_status = "cancelled" if self.stopped else "completed"
         with self.lock:
@@ -100,7 +88,9 @@ def test_request_validates_backend_specific_local_model(tmp_path):
     assert faster_request.local_model_path == str(directory.resolve())
 
     with pytest.raises(ValidationError):
-        make_request(tmp_path, backend="faster-whisper", local_model_path=str(checkpoint))
+        make_request(
+            tmp_path, backend="faster-whisper", local_model_path=str(checkpoint)
+        )
 
 
 def test_job_manager_runs_jobs_serially_and_maps_worker_options(tmp_path):
@@ -132,8 +122,8 @@ def test_job_manager_runs_jobs_serially_and_maps_worker_options(tmp_path):
 def test_job_manager_records_worker_errors_and_completion_status(tmp_path):
     class ErrorWorker(FakeWorker):
         def run(self):
-            self.progress.emit("Writing outputs", 75)
-            self.error_occurred.emit("one file failed")
+            self.progress_callback("Writing outputs", 75)
+            self.error_callback("one file failed")
             self.completion_status = "completed_with_errors"
 
     manager = api.JobManager(ErrorWorker)
@@ -150,6 +140,24 @@ def test_job_manager_records_worker_errors_and_completion_status(tmp_path):
     assert record["error_count"] == 1
 
 
+def test_job_manager_never_regresses_reported_progress(tmp_path):
+    class RegressiveWorker(FakeWorker):
+        def run(self):
+            self.progress_callback("Later", 80)
+            self.progress_callback("Stale", 20)
+            self.completion_status = "cancelled"
+
+    manager = api.JobManager(RegressiveWorker)
+    manager.start()
+    try:
+        submitted = manager.submit(make_request(tmp_path))
+        record = wait_for_status(manager, submitted["id"], {"cancelled"})
+    finally:
+        manager.shutdown(timeout=1)
+
+    assert record["progress"] == 80
+
+
 def test_job_manager_caps_stored_errors_and_shutdown_is_safe(tmp_path):
     entered = threading.Event()
 
@@ -159,7 +167,7 @@ def test_job_manager_caps_stored_errors_and_shutdown_is_safe(tmp_path):
             while not self.stopped:
                 time.sleep(0.005)
             for index in range(5):
-                self.error_occurred.emit(f"error {index}")
+                self.error_callback(f"error {index}")
             self.completion_status = "cancelled"
 
     manager = api.JobManager(ShutdownWorker, max_errors_per_job=2)
@@ -242,7 +250,10 @@ def test_job_manager_cancels_queued_and_running_jobs(tmp_path):
     assert manager.cancel(first["id"])["status"] == "cancelling"
     release.set()
     try:
-        assert wait_for_status(manager, first["id"], {"cancelled"})["status"] == "cancelled"
+        assert (
+            wait_for_status(manager, first["id"], {"cancelled"})["status"]
+            == "cancelled"
+        )
     finally:
         manager.shutdown()
 
@@ -296,9 +307,20 @@ def test_api_returns_422_for_invalid_request_and_429_for_full_queue(tmp_path):
     manager = api.JobManager(BlockingWorker, max_queue_size=1)
     app = api.create_app(manager)
     with TestClient(app) as client:
-        assert client.post("/v1/jobs", json={"folder_path": "missing"}).status_code == 422
-        assert client.post("/v1/jobs", json={"folder_path": str(tmp_path)}).status_code == 202
+        assert (
+            client.post("/v1/jobs", json={"folder_path": "missing"}).status_code == 422
+        )
+        assert (
+            client.post("/v1/jobs", json={"folder_path": str(tmp_path)}).status_code
+            == 202
+        )
         assert entered.wait(1)
-        assert client.post("/v1/jobs", json={"folder_path": str(tmp_path)}).status_code == 202
-        assert client.post("/v1/jobs", json={"folder_path": str(tmp_path)}).status_code == 429
+        assert (
+            client.post("/v1/jobs", json={"folder_path": str(tmp_path)}).status_code
+            == 202
+        )
+        assert (
+            client.post("/v1/jobs", json={"folder_path": str(tmp_path)}).status_code
+            == 429
+        )
         release.set()

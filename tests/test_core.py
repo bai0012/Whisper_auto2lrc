@@ -1,0 +1,81 @@
+import subprocess
+import sys
+
+import core
+
+
+def test_core_and_api_import_without_qt_modules():
+    code = (
+        "import sys; import core, api; "
+        "assert not any(name.startswith('PyQt') for name in sys.modules)"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_runner_progress_is_monotonic_and_advances_for_empty_and_error(
+    tmp_path, monkeypatch
+):
+    for name in ("a.mp3", "b.mp3", "c.mp3"):
+        (tmp_path / name).touch()
+
+    class Backend:
+        def cache_key(self, *_args):
+            return ("fake",)
+
+        def load_model(self, *_args):
+            return object()
+
+        def transcribe(self, _model, path, _language):
+            if path.name == "a.mp3":
+                return {"segments": []}
+            if path.name == "b.mp3":
+                raise RuntimeError("broken")
+            return {"segments": [{"start": 0, "end": 1, "text": "ok"}]}
+
+    monkeypatch.setattr(core, "create_backend", lambda *_args, **_kwargs: Backend())
+    progress = []
+    errors = []
+    runner = core.TranscriptionRunner(
+        tmp_path,
+        "base",
+        "auto",
+        progress_callback=lambda _message, value: progress.append(value),
+        error_callback=errors.append,
+    )
+
+    assert runner.run() == "completed_with_errors"
+    assert progress == sorted(progress)
+    assert progress[-1] == 100
+    assert len(errors) == 2
+    assert (tmp_path / "c.lrc").exists()
+
+
+def test_runner_validates_folder_and_output_formats(tmp_path):
+    errors = []
+    missing = core.TranscriptionRunner(
+        tmp_path / "missing", "base", "auto", error_callback=errors.append
+    )
+    assert missing.run() == "failed"
+    no_formats = core.TranscriptionRunner(
+        tmp_path, "base", "auto", output_formats=(), error_callback=errors.append
+    )
+    assert no_formats.run() == "failed"
+
+
+def test_discovery_stops_early_when_cancellation_is_requested(tmp_path):
+    for index in range(20):
+        (tmp_path / f"{index:02}.mp3").touch()
+    checks = 0
+
+    def stop_requested():
+        nonlocal checks
+        checks += 1
+        return checks >= 3
+
+    tasks, conflicts = core.discover_audio_tasks(
+        tmp_path, ("lrc",), stop_requested=stop_requested
+    )
+
+    assert checks == 3
+    assert len(tasks) < 20
+    assert conflicts == []

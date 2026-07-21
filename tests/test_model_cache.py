@@ -3,6 +3,7 @@ import time
 import weakref
 from types import SimpleNamespace
 
+import core
 import main
 
 
@@ -109,7 +110,7 @@ def test_worker_reports_loaded_then_cached_model(tmp_path, monkeypatch):
     calls = []
     model = SimpleNamespace(transcribe=lambda *_args, **_kwargs: {"segments": []})
     monkeypatch.setattr(
-        main,
+        core,
         "whisper",
         SimpleNamespace(load_model=lambda name: calls.append(name) or model),
     )
@@ -134,7 +135,9 @@ def test_worker_model_load_failure_is_failed_and_uncached(tmp_path, monkeypatch)
     monkeypatch.setattr(
         main,
         "whisper",
-        SimpleNamespace(load_model=lambda _name: (_ for _ in ()).throw(RuntimeError("bad"))),
+        SimpleNamespace(
+            load_model=lambda _name: (_ for _ in ()).throw(RuntimeError("bad"))
+        ),
     )
     (tmp_path / "song.mp3").touch()
     errors = []
