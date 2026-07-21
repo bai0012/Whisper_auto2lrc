@@ -30,7 +30,7 @@ jobs:
           python -m pip install -r requirements-dev.txt
 
       - name: Lint
-        run: python -m ruff check main.py tests
+        run: python -m ruff check main.py api.py tests
 
       - name: Run unit tests
         run: python -m pytest -s tests

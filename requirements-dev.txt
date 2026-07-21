@@ -1,3 +1,5 @@
 PyQt6>=6.8,<7
+fastapi>=0.116,<1
+httpx>=0.28,<1
 pytest>=8,<9
 ruff==0.15.22
