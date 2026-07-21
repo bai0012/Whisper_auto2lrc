@@ -13,6 +13,8 @@ Whisper_auto2lrc uses either OpenAI Whisper or Faster Whisper to convert all med
 
 The project requires **Python 3.14**. Transcription and batch processing live in a pure-Python core with no Qt dependency; the PyQt6 desktop Worker and REST API are separate adapters around that shared core. Both entry points therefore use the same scanning, progress, cancellation, model-cache, and output behavior.
 
+The planned command-line interface, including its arguments, output protocol, and exit codes, is specified in the [CLI design document](docs/cli-design.md).
+
 The application provides a PyQt6 desktop interface and supports two interchangeable transcription backends:
 
 - **OpenAI Whisper** uses PyTorch and the system FFmpeg executable.

@@ -9,6 +9,8 @@
 
 项目要求 **Python 3.14**。转录与批处理逻辑位于纯 Python 核心层，不依赖 Qt；PyQt6 桌面 Worker 和 REST API 分别只是核心层的界面适配器。两种入口共享相同的扫描、进度、取消、模型缓存和输出逻辑。
 
+计划中的命令行接口及其参数、输出协议和退出码见 [CLI 接口设计](docs/cli-design.md)。
+
 程序提供 PyQt6 桌面界面，并支持两个可切换的转录后端：
 
 - **OpenAI Whisper** 使用 PyTorch 和系统中的 FFmpeg 可执行文件。
