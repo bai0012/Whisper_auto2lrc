@@ -9,12 +9,17 @@
     <br> English | <a href="README-CN.md">中文</a>
 
 
-Whisper_auto2lrc is a tool that uses the whisper model and a Python program to convert all audio files in a folder (and its subfolders) into .lrc subtitle files. If an lrc subtitle file already exists, it will be automatically skipped.
+Whisper_auto2lrc uses either OpenAI Whisper or Faster Whisper to convert all media files in a folder (and its subfolders) into one or more subtitle/transcript formats: LRC, SRT, VTT, TXT, TSV, and JSON. Existing output files are never overwritten.
+
+The application provides a PyQt6 desktop interface and supports two interchangeable transcription backends:
+
+- **OpenAI Whisper** uses PyTorch and the system FFmpeg executable.
+- **Faster Whisper** uses CTranslate2 and PyAV for faster, memory-efficient inference.
 
 
 ## What can this program do?
 
-It uses the whisper speech-to-text model released by OpenAI. Users can specify the audio file folder to be processed, and the program will automatically recursively search for all audio files in the folder and transcribe them into lrc format subtitle files.
+It uses the Whisper speech-to-text model released by OpenAI. Users specify a media folder, and the program recursively finds supported files and exports every selected format from a single transcription pass.
 
 It is suitable for users who need to transcribe a large number of audio files into subtitles.
 
@@ -27,11 +32,7 @@ It is suitable for users who need to transcribe a large number of audio files in
 
 First, install Python, which has been tested on Python 3.11
 
-Then, install the Python dependencies required by whisper [openai/whisper](https://github.com/openai/whisper#setup):
-
-```python
-pip install git+https://github.com/openai/whisper.git 
-```
+Both supported transcription backends are installed by `requirements.txt`.
 
 ## How to use
 
@@ -51,7 +52,7 @@ cd Whisper_auto2lrc
 pip install -r requirements.txt 
 ```
 
-Download FFmpeg and add the folder containing ffmpeg.exe to the system variables. For example, [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases).
+If you use the OpenAI Whisper backend, download FFmpeg and add the folder containing ffmpeg.exe to the system variables. For example, [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases). Faster Whisper decodes media through PyAV and does not require a system FFmpeg installation.
 
 With the terminal at the base of the project folder, run
 
@@ -59,13 +60,35 @@ With the terminal at the base of the project folder, run
 python main.py
 ```
 
-In the window, select the folder path, choose the model size to use, enter the language of the audio files to be processed, and click start.
+In the window, select the backend, model, folder path, transcription language, and one or more output formats, then click start. OpenAI Whisper with the `base` model is the default. Switching the backend refreshes the model list: both backends expose the standard Whisper models, while Faster Whisper additionally supports optimized, English-only Distil-Whisper models. LRC is selected by default. The transcription language defaults to `auto`, which lets Whisper detect it automatically; leaving the field blank has the same effect.
+
+To avoid downloading a model at processing time, enable **Use Local Model**. For OpenAI Whisper, select a downloaded checkpoint file (normally a `.pt` file). For Faster Whisper, select a complete local **CTranslate2 model directory**, not a PyTorch checkpoint or a Hugging Face cache parent directory. Faster Whisper opens a selected local directory with downloads disabled. The enabled state and path are remembered separately for each backend, and local model paths participate in the in-memory model cache key.
+
+The available output formats are LRC, SRT, VTT, TXT, TSV, and JSON. A media file is transcribed only once for all selected formats. Existing selected outputs are preserved, while any missing selected outputs are created. If multiple media files have the same path and stem (for example, `song.mp3` and `song.wav`), the whole ambiguous group is skipped and reported.
+
+The display language can be switched between English and Simplified Chinese at the top of the window. The application remembers UI settings between launches. It also caches the most recently loaded backend/model/runtime combination, so running the same selection again does not reload it; changing one of those settings replaces the cached model.
+
+Faster Whisper offers `Auto`, `CPU`, and `CUDA` device choices. `Auto` uses CUDA + FP16 when CTranslate2 detects a usable CUDA device and otherwise uses CPU + INT8. If automatic CUDA initialization fails, processing retries on CPU + INT8 and reports the fallback in the log. Choose `CPU` to force the portable path or `CUDA` to require GPU execution.
+
+### Running the unit tests
+
+The tests use fake Whisper models and do not require real audio files or model downloads:
+
+```Powershell
+pip install -r requirements-dev.txt
+python -m ruff check main.py tests
+python -m pytest -s tests
+```
+
+### Windows release package
+
+GitHub releases provide `Whisper_auto2lrc-windows-x64.zip`. It is a PyInstaller **onedir** build: extract the entire archive, keep all bundled files together, and launch `Whisper_auto2lrc.exe` from the extracted folder. The directory layout is intentional and avoids the startup and temporary-extraction overhead of a one-file executable.
 
 ## Troubleshooting
 
-### Why is my Whisper only using the CPU?
+### Why is the selected backend only using the CPU?
 
-Whisper can call GPUs that support CUDA. If you are sure that your GPU has been correctly installed and supports CUDA, try the following steps:
+OpenAI Whisper uses PyTorch. If it does not detect CUDA, install the CUDA build that matches your graphics driver by following the [PyTorch installation guide](https://pytorch.org/get-started/locally/).
 
 ```python 
 pip uninstall torch
@@ -74,30 +97,18 @@ pip uninstall torch
 ```python 
 pip cache purge
 ```
-Then install the latest PyTorch using the command on the [PyTorch](https://pytorch.org/get-started/locally/)
+Then install the appropriate PyTorch build, for example:
 
 For example:
 ```python
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 ```
 
-You should be able to call the graphics card normally.
+Faster Whisper uses CTranslate2. Its current NVIDIA backend requires CUDA 12 cuBLAS and cuDNN 9; see the [Faster Whisper GPU instructions](https://github.com/SYSTRAN/faster-whisper#gpu). The application falls back to CPU + INT8 when CUDA detection fails.
 
-### Why is ffmpeg giving an error when I use it?
+### Why is FFmpeg giving an error when I use it?
 
-You can try the following steps to reinstall ffmpeg:
-
-```python
-pip uninstall ffmpeg
-```
-
-```python 
-pip uninstall ffmpeg-python
-```
-
-```python
-pip install ffmpeg-python
-```
+Only the OpenAI Whisper backend requires the system FFmpeg executable. Run `ffmpeg -version` in a new terminal to verify that it is installed and visible on `PATH`; if the command is not found, install an FFmpeg build and add its `bin` directory to `PATH`, then restart the application. The Python package named `ffmpeg-python` is not an FFmpeg executable and is neither required nor a substitute for this installation.
 
 ### Which model should I choose and what are the differences between each model?
 
@@ -111,13 +122,7 @@ Refer to [openai/whisper](https://github.com/openai/whisper#available-models-and
 | large  |   1550 M   |        N/A         |      `large`       |    ~10 GB     |       1x       |
 | turbo  |   809 M    |        N/A         |      `turbo`       |     ~6 GB     |      ~8x       |
 
-Choose the model based on the size of the VRAM on your GPU. Generally, the larger the model, the faster the speed and the lower the error rate.
-
-(For example, if you have an RTX3060 12G, you can choose the large model, but if you have a GTX 1050ti 4G, you can only use the small model)
-
-Faster Whisper uses the same models but requires less VRAM, so try it out for yourself.
-
-(Faster Whisper can even run the large model on a 1050ti 4G, although it sometimes runs out of VRAM, so a 6G VRAM should be enough to run the large model)
+Choose a model based on available VRAM, desired accuracy, and processing speed. Larger models are generally more accurate but slower and more memory intensive; `turbo` is a strong default when balancing speed and accuracy. Faster Whisper also offers Distil-Whisper models and INT8 execution for lower memory use.
 
 ### What should I enter in the language input box?
 
