@@ -4,36 +4,78 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
 
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
-      - name: Install dependencies
+      - name: Install pinned release dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -U openai-whisper
-          pip install pyinstaller
+          python -m pip install -r requirements-release.txt
 
-      - name: Build with PyInstaller
+      - name: Lint
+        run: python -m ruff check main.py tests
+
+      - name: Run unit tests
+        run: python -m pytest -s tests
+
+      - name: Build onedir application
+        run: >-
+          pyinstaller
+          --noconfirm
+          --clean
+          --onedir
+          --windowed
+          --name Whisper_auto2lrc
+          --collect-all whisper
+          --collect-all faster_whisper
+          --collect-all ctranslate2
+          --collect-all tiktoken
+          --collect-all av
+          --collect-submodules tiktoken_ext
+          --hidden-import tiktoken_ext.openai_public
+          main.py
+
+      - name: Smoke-test packaged application
+        shell: pwsh
         run: |
-          pyinstaller --onefile --name whisper_auto2lrc main.py
+          $exe = Resolve-Path "dist/Whisper_auto2lrc/Whisper_auto2lrc.exe"
+          $archive = pyi-archive_viewer -l $exe | Out-String
+          if ($archive -notmatch "main") {
+            throw "Packaged executable does not contain the application entry point."
+          }
+          $process = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) {
+            throw "Packaged application exited during its startup smoke test."
+          }
+          Stop-Process -Id $process.Id -Force
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+      - name: Create Windows ZIP
+        shell: pwsh
+        run: >-
+          Compress-Archive
+          -Path dist/Whisper_auto2lrc/*
+          -DestinationPath dist/Whisper_auto2lrc-windows-x64.zip
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./dist/whisper_auto2lrc.exe
-          asset_name: whisper_auto2lrc.exe
-          asset_content_type: application/octet-stream
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: dist/Whisper_auto2lrc-windows-x64.zip

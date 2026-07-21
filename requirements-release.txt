@@ -1,0 +1,10 @@
+# Versions exercised by the Windows release workflow. Runtime transitive
+# dependencies remain owned by the two Whisper backends.
+PyQt6==6.11.0
+openai-whisper==20250625
+faster-whisper==1.2.1
+ctranslate2==4.8.1
+av==18.0.0
+pytest>=8,<9
+ruff==0.15.22
+PyInstaller==6.21.0
